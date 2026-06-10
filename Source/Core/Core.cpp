@@ -1,3 +1,9 @@
+#include "Core/BaseTypes.h"
+#include "Core/Logger.h"
 
-// TODO: write your library functions here
-
+namespace Core
+{
+    void CoreModuleAnchor()
+    {
+    }
+}
