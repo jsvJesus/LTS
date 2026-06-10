@@ -44,6 +44,30 @@ namespace Engine
 
         mMainWindow.Show();
 
+        if (mCreateInfo.EnableRendering)
+        {
+            Render::DX11DeviceCreateInfo renderCreateInfo;
+            renderCreateInfo.NativeWindowHandle = mMainWindow.GetNativeHandle();
+            renderCreateInfo.Width = mMainWindow.GetWidth();
+            renderCreateInfo.Height = mMainWindow.GetHeight();
+            renderCreateInfo.EnableVSync = mCreateInfo.EnableVSync;
+
+        #if defined(GAME_DEBUG)
+            renderCreateInfo.EnableDebugLayer = true;
+        #else
+            renderCreateInfo.EnableDebugLayer = false;
+        #endif
+
+            if (!mRenderDevice.Initialize(renderCreateInfo))
+            {
+                Core::Logger::Fatal("EngineLoop", "Failed to initialize render device.");
+                mMainWindow.Destroy();
+                return false;
+            }
+
+            mRenderInitialized = true;
+        }
+
         mFrameTimer.Reset();
 
         mInitialized = true;
@@ -78,6 +102,7 @@ namespace Engine
             mFrameTimer.Tick();
 
             Tick();
+            RenderFrame();
 
             SleepToFrameLimit();
         }
@@ -100,6 +125,12 @@ namespace Engine
 
         mRunning = false;
         mShutdownRequested = true;
+
+        if (mRenderInitialized)
+        {
+            mRenderDevice.Shutdown();
+            mRenderInitialized = false;
+        }
 
         mMainWindow.Destroy();
 
@@ -139,10 +170,31 @@ namespace Engine
         return mMainWindow;
     }
 
+    Render::DX11Device& EngineLoop::GetRenderDevice()
+    {
+        return mRenderDevice;
+    }
+
     void EngineLoop::Tick()
     {
-        // Сейчас тут пусто.
-        // Следующий шаг: сюда подключим Render Tick / DX11 clear screen.
+        // Game / Editor update будет здесь.
+        // Сейчас главный результат — стабильный loop + render clear.
+    }
+
+    void EngineLoop::RenderFrame()
+    {
+        if (!mRenderInitialized)
+        {
+            return;
+        }
+
+        mRenderDevice.ResizeIfNeeded(
+            mMainWindow.GetWidth(),
+            mMainWindow.GetHeight()
+        );
+
+        mRenderDevice.BeginFrame(mCreateInfo.ClearColor);
+        mRenderDevice.EndFrame();
     }
 
     void EngineLoop::SleepToFrameLimit()

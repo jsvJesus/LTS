@@ -1,3 +1,8 @@
+#include "Render/DX11/DX11Device.h"
 
-// TODO: write your library functions here
-
+namespace Render
+{
+    void RenderModuleAnchor()
+    {
+    }
+}

@@ -29,19 +29,23 @@ namespace Engine
 
         [[nodiscard]] const FrameTimer& GetFrameTimer() const;
         [[nodiscard]] Platform::Window& GetMainWindow();
+        [[nodiscard]] Render::DX11Device& GetRenderDevice();
 
     private:
         void Tick();
+        void RenderFrame();
         void SleepToFrameLimit();
 
     private:
         EngineCreateInfo mCreateInfo{};
 
         Platform::Window mMainWindow;
+        Render::DX11Device mRenderDevice;
         FrameTimer mFrameTimer;
 
         bool mInitialized = false;
         bool mRunning = false;
         bool mShutdownRequested = false;
+        bool mRenderInitialized = false;
     };
 }
