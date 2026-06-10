@@ -9,6 +9,7 @@
 namespace Platform
 {
     class Window;
+    class InputSystem;
 }
 
 namespace Render
@@ -43,6 +44,7 @@ namespace Engine
         std::uint64_t mFrameIndex = 0;
 
         std::unique_ptr<Platform::Window> mWindow;
+        std::unique_ptr<Platform::InputSystem> mInputSystem;
         std::unique_ptr<Render::RenderSystem> mRenderSystem;
 
         std::chrono::steady_clock::time_point mLastFrameTime {};

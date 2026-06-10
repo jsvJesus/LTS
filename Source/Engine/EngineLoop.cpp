@@ -1,5 +1,7 @@
 #include "EngineLoop.h"
 
+#include "../Core/Logger.h"
+#include "../Platform/Input.h"
 #include "../Platform/Window.h"
 #include "../Render/RenderSystem.h"
 
@@ -81,6 +83,14 @@ namespace Engine
             return false;
         }
 
+        mInputSystem = std::make_unique<Platform::InputSystem>();
+
+        if (!mInputSystem->Initialize(mWindow->GetNativeHandle()))
+        {
+            Shutdown();
+            return false;
+        }
+
         Render::FRenderSystemDesc renderDesc {};
         renderDesc.NativeWindowHandle = mWindow->GetNativeHandle();
         renderDesc.Width = static_cast<std::uint32_t>(mWindow->GetWidth());
@@ -114,6 +124,8 @@ namespace Engine
         mRunning = true;
         mInitialized = true;
 
+        Core::Logger::Info("Engine", "Engine loop initialized.");
+
         return true;
     }
 
@@ -146,6 +158,12 @@ namespace Engine
             const double deltaSeconds = delta.count();
 
             HandleResize();
+
+            if (mInputSystem)
+            {
+                mInputSystem->Update();
+            }
+
             Tick(deltaSeconds);
             RenderFrame(deltaSeconds);
 
@@ -165,6 +183,12 @@ namespace Engine
             mRenderSystem.reset();
         }
 
+        if (mInputSystem)
+        {
+            mInputSystem->Shutdown();
+            mInputSystem.reset();
+        }
+
         if (mWindow)
         {
             mWindow->Destroy();
@@ -179,8 +203,20 @@ namespace Engine
     {
         (void)deltaSeconds;
 
+        if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F1))
+        {
+            Core::Logger::Info("Input", "F1 pressed.");
+        }
+
+        if (mInputSystem && mInputSystem->IsMouseButtonPressed(Platform::MouseButton::Left))
+        {
+            Core::Logger::Info("Input", "Left mouse button pressed.");
+        }
+
         // Позже тут будут:
-        // input update
+        // input mapping
+        // editor camera
+        // game camera
         // world tick
         // editor tick
         // game tick
