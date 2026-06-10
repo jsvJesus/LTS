@@ -49,59 +49,61 @@ namespace Core
 
     bool Logger::Initialize(const LoggerConfig& config)
     {
-        std::scoped_lock lock(GLoggerMutex);
-
-        if (GLoggerInitialized)
         {
-            return true;
-        }
+            std::scoped_lock lock(GLoggerMutex);
 
-        GLoggerConfig = config;
-
-        if (GLoggerConfig.ApplicationName.empty())
-        {
-            GLoggerConfig.ApplicationName = "Application";
-        }
-
-        if (GLoggerConfig.LogDirectory.empty())
-        {
-            GLoggerConfig.LogDirectory = "Logs";
-        }
-
-        if (GLoggerConfig.WriteToFile)
-        {
-            std::error_code errorCode;
-            std::filesystem::create_directories(GLoggerConfig.LogDirectory, errorCode);
-
-            if (errorCode)
+            if (GLoggerInitialized)
             {
-                std::cerr << "[Logger] Failed to create log directory: "
-                          << GLoggerConfig.LogDirectory.string()
-                          << " | Error: "
-                          << errorCode.message()
-                          << '\n';
-
-                GLoggerConfig.WriteToFile = false;
+                return true;
             }
-            else
+
+            GLoggerConfig = config;
+
+            if (GLoggerConfig.ApplicationName.empty())
             {
-                const String safeName = SanitizeFileName(GLoggerConfig.ApplicationName);
-                const Path logFilePath = GLoggerConfig.LogDirectory / (safeName + "_" + GetTimestampForFileName() + ".log");
+                GLoggerConfig.ApplicationName = "Application";
+            }
 
-                GLogFile.open(logFilePath, std::ios::out | std::ios::app);
+            if (GLoggerConfig.LogDirectory.empty())
+            {
+                GLoggerConfig.LogDirectory = "Logs";
+            }
 
-                if (!GLogFile.is_open())
+            if (GLoggerConfig.WriteToFile)
+            {
+                std::error_code errorCode;
+                std::filesystem::create_directories(GLoggerConfig.LogDirectory, errorCode);
+
+                if (errorCode)
                 {
-                    std::cerr << "[Logger] Failed to open log file: "
-                              << logFilePath.string()
+                    std::cerr << "[Logger] Failed to create log directory: "
+                              << GLoggerConfig.LogDirectory.string()
+                              << " | Error: "
+                              << errorCode.message()
                               << '\n';
 
                     GLoggerConfig.WriteToFile = false;
                 }
-            }
-        }
+                else
+                {
+                    const String safeName = SanitizeFileName(GLoggerConfig.ApplicationName);
+                    const Path logFilePath = GLoggerConfig.LogDirectory / (safeName + "_" + GetTimestampForFileName() + ".log");
 
-        GLoggerInitialized = true;
+                    GLogFile.open(logFilePath, std::ios::out | std::ios::app);
+
+                    if (!GLogFile.is_open())
+                    {
+                        std::cerr << "[Logger] Failed to open log file: "
+                                  << logFilePath.string()
+                                  << '\n';
+
+                        GLoggerConfig.WriteToFile = false;
+                    }
+                }
+            }
+
+            GLoggerInitialized = true;
+        }
 
         Write(LogLevel::Info, "Logger", "Logger initialized");
         Write(LogLevel::Info, "Core", String("Build configuration: ") + String(GetBuildConfigurationName()));

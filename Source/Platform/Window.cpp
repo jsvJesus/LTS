@@ -416,9 +416,9 @@ namespace Platform
             }
 
             window->mIsOpen = false;
+            window->mCloseRequested = true;
             window->mHasFocus = false;
 
-            ::PostQuitMessage(0);
             return 0;
 
         case WM_SETFOCUS:
