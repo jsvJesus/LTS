@@ -188,12 +188,16 @@ namespace Engine
             return;
         }
 
-        mRenderDevice.ResizeIfNeeded(
+        if (!mRenderDevice.ResizeIfNeeded(
             mMainWindow.GetWidth(),
             mMainWindow.GetHeight()
-        );
+        ))
+        {
+            return;
+        }
 
         mRenderDevice.BeginFrame(mCreateInfo.ClearColor);
+        mRenderDevice.DrawDebugTriangle();
         mRenderDevice.EndFrame();
     }
 

@@ -3,14 +3,57 @@
 #include "Core/Logger.h"
 
 #include <Windows.h>
+#include <d3dcompiler.h>
 
+#include <cstdio>
+#include <cstring>
 #include <string>
 
 #pragma comment(lib, "D3D11.lib")
 #pragma comment(lib, "DXGI.lib")
+#pragma comment(lib, "D3DCompiler.lib")
 
 namespace Render
 {
+    namespace
+    {
+        constexpr const char* DebugTriangleShaderSource = R"(
+struct VSOutput
+{
+    float4 Position : SV_POSITION;
+    float4 Color    : COLOR0;
+};
+
+VSOutput VSMain(uint vertexId : SV_VertexID)
+{
+    float2 positions[3] =
+    {
+        float2( 0.0f,  0.65f),
+        float2( 0.65f, -0.65f),
+        float2(-0.65f, -0.65f)
+    };
+
+    float4 colors[3] =
+    {
+        float4(0.10f, 0.90f, 0.35f, 1.0f),
+        float4(0.95f, 0.25f, 0.15f, 1.0f),
+        float4(0.15f, 0.40f, 1.00f, 1.0f)
+    };
+
+    VSOutput output;
+    output.Position = float4(positions[vertexId], 0.5f, 1.0f);
+    output.Color = colors[vertexId];
+
+    return output;
+}
+
+float4 PSMain(VSOutput input) : SV_TARGET
+{
+    return input.Color;
+}
+)";
+    }
+
     DX11Device::~DX11Device()
     {
         Shutdown();
@@ -74,6 +117,20 @@ namespace Render
             return false;
         }
 
+        if (!CreateDepthStencilBuffer())
+        {
+            Core::Logger::Fatal("DX11Device", "Failed to create depth stencil buffer.");
+            Shutdown();
+            return false;
+        }
+
+        if (!CreateDebugTrianglePipeline())
+        {
+            Core::Logger::Fatal("DX11Device", "Failed to create debug triangle pipeline.");
+            Shutdown();
+            return false;
+        }
+
         mInitialized = true;
 
         Core::Logger::Info("DX11Device", "DX11 device initialized.");
@@ -93,7 +150,8 @@ namespace Render
 
         Core::Logger::Info("DX11Device", "DX11 device shutdown started.");
 
-        ReleaseBackBufferRenderTarget();
+        ReleaseDebugTrianglePipeline();
+        ReleaseBackBufferResources();
 
         if (mDeviceContext)
         {
@@ -115,7 +173,7 @@ namespace Render
 
     void DX11Device::BeginFrame(const ClearColor& clearColor)
     {
-        if (!mInitialized || !mDeviceContext || !mBackBufferRenderTargetView)
+        if (!mInitialized || !mDeviceContext || !mBackBufferRenderTargetView || !mDepthStencilView)
         {
             return;
         }
@@ -133,7 +191,7 @@ namespace Render
             mBackBufferRenderTargetView.Get()
         };
 
-        mDeviceContext->OMSetRenderTargets(1, renderTargets, nullptr);
+        mDeviceContext->OMSetRenderTargets(1, renderTargets, mDepthStencilView.Get());
 
         D3D11_VIEWPORT viewport{};
         viewport.TopLeftX = 0.0f;
@@ -144,7 +202,30 @@ namespace Render
         viewport.MaxDepth = 1.0f;
 
         mDeviceContext->RSSetViewports(1, &viewport);
+
         mDeviceContext->ClearRenderTargetView(mBackBufferRenderTargetView.Get(), color);
+        mDeviceContext->ClearDepthStencilView(
+            mDepthStencilView.Get(),
+            D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+            1.0f,
+            0
+        );
+    }
+
+    void DX11Device::DrawDebugTriangle()
+    {
+        if (!mInitialized || !mDeviceContext || !mDebugTriangleVertexShader || !mDebugTrianglePixelShader)
+        {
+            return;
+        }
+
+        mDeviceContext->IASetInputLayout(nullptr);
+        mDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        mDeviceContext->VSSetShader(mDebugTriangleVertexShader.Get(), nullptr, 0);
+        mDeviceContext->PSSetShader(mDebugTrianglePixelShader.Get(), nullptr, 0);
+
+        mDeviceContext->Draw(3, 0);
     }
 
     void DX11Device::EndFrame()
@@ -187,13 +268,13 @@ namespace Render
             "Resizing swapchain to " + std::to_string(width) + "x" + std::to_string(height)
         );
 
-        ReleaseBackBufferRenderTarget();
-
         if (mDeviceContext)
         {
             mDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
             mDeviceContext->Flush();
         }
+
+        ReleaseBackBufferResources();
 
         const HRESULT result = mSwapChain->ResizeBuffers(
             0,
@@ -212,7 +293,17 @@ namespace Render
         mBackBufferWidth = width;
         mBackBufferHeight = height;
 
-        return CreateBackBufferRenderTarget();
+        if (!CreateBackBufferRenderTarget())
+        {
+            return false;
+        }
+
+        if (!CreateDepthStencilBuffer())
+        {
+            return false;
+        }
+
+        return true;
     }
 
     bool DX11Device::ResizeIfNeeded(const Core::i32 width, const Core::i32 height)
@@ -288,7 +379,7 @@ namespace Render
             deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
         }
 
-        const D3D_FEATURE_LEVEL requestedFeatureLevels[] =
+        const D3D_FEATURE_LEVEL requestedFeatureLevelsModern[] =
         {
             D3D_FEATURE_LEVEL_11_1,
             D3D_FEATURE_LEVEL_11_0,
@@ -296,15 +387,22 @@ namespace Render
             D3D_FEATURE_LEVEL_10_0
         };
 
+        const D3D_FEATURE_LEVEL requestedFeatureLevelsFallback[] =
+        {
+            D3D_FEATURE_LEVEL_11_0,
+            D3D_FEATURE_LEVEL_10_1,
+            D3D_FEATURE_LEVEL_10_0
+        };
+
         D3D_FEATURE_LEVEL createdFeatureLevel{};
 
-        const HRESULT result = ::D3D11CreateDeviceAndSwapChain(
+        HRESULT result = ::D3D11CreateDeviceAndSwapChain(
             nullptr,
             D3D_DRIVER_TYPE_HARDWARE,
             nullptr,
             deviceFlags,
-            requestedFeatureLevels,
-            static_cast<UINT>(std::size(requestedFeatureLevels)),
+            requestedFeatureLevelsModern,
+            static_cast<UINT>(sizeof(requestedFeatureLevelsModern) / sizeof(requestedFeatureLevelsModern[0])),
             D3D11_SDK_VERSION,
             &swapChainDesc,
             mSwapChain.GetAddressOf(),
@@ -312,6 +410,28 @@ namespace Render
             &createdFeatureLevel,
             mDeviceContext.GetAddressOf()
         );
+
+        if (result == E_INVALIDARG)
+        {
+            mSwapChain.Reset();
+            mDeviceContext.Reset();
+            mDevice.Reset();
+
+            result = ::D3D11CreateDeviceAndSwapChain(
+                nullptr,
+                D3D_DRIVER_TYPE_HARDWARE,
+                nullptr,
+                deviceFlags,
+                requestedFeatureLevelsFallback,
+                static_cast<UINT>(sizeof(requestedFeatureLevelsFallback) / sizeof(requestedFeatureLevelsFallback[0])),
+                D3D11_SDK_VERSION,
+                &swapChainDesc,
+                mSwapChain.GetAddressOf(),
+                mDevice.GetAddressOf(),
+                &createdFeatureLevel,
+                mDeviceContext.GetAddressOf()
+            );
+        }
 
         if (FAILED(result))
         {
@@ -362,12 +482,166 @@ namespace Render
         return true;
     }
 
-    void DX11Device::ReleaseBackBufferRenderTarget()
+    bool DX11Device::CreateDepthStencilBuffer()
     {
-        if (mBackBufferRenderTargetView)
+        if (!mDevice)
         {
-            mBackBufferRenderTargetView.Reset();
+            return false;
         }
+
+        D3D11_TEXTURE2D_DESC textureDesc{};
+        textureDesc.Width = static_cast<UINT>(mBackBufferWidth);
+        textureDesc.Height = static_cast<UINT>(mBackBufferHeight);
+        textureDesc.MipLevels = 1;
+        textureDesc.ArraySize = 1;
+        textureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        textureDesc.SampleDesc.Count = 1;
+        textureDesc.SampleDesc.Quality = 0;
+        textureDesc.Usage = D3D11_USAGE_DEFAULT;
+        textureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        textureDesc.CPUAccessFlags = 0;
+        textureDesc.MiscFlags = 0;
+
+        const HRESULT textureResult = mDevice->CreateTexture2D(
+            &textureDesc,
+            nullptr,
+            mDepthStencilTexture.GetAddressOf()
+        );
+
+        if (FAILED(textureResult))
+        {
+            Core::Logger::Error("DX11Device", FormatHRESULT("CreateTexture2D depth failed.", textureResult));
+            return false;
+        }
+
+        D3D11_DEPTH_STENCIL_VIEW_DESC viewDesc{};
+        viewDesc.Format = textureDesc.Format;
+        viewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+        viewDesc.Texture2D.MipSlice = 0;
+
+        const HRESULT viewResult = mDevice->CreateDepthStencilView(
+            mDepthStencilTexture.Get(),
+            &viewDesc,
+            mDepthStencilView.GetAddressOf()
+        );
+
+        if (FAILED(viewResult))
+        {
+            Core::Logger::Error("DX11Device", FormatHRESULT("CreateDepthStencilView failed.", viewResult));
+            return false;
+        }
+
+        Core::Logger::Info("DX11Device", "Depth stencil buffer created.");
+
+        return true;
+    }
+
+    bool DX11Device::CreateDebugTrianglePipeline()
+    {
+        if (!mDevice)
+        {
+            return false;
+        }
+
+        UINT compileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+
+    #if defined(GAME_DEBUG)
+        compileFlags |= D3DCOMPILE_DEBUG;
+        compileFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
+    #else
+        compileFlags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
+    #endif
+
+        Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> pixelShaderBlob;
+        Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+
+        HRESULT vertexCompileResult = ::D3DCompile(
+            DebugTriangleShaderSource,
+            std::strlen(DebugTriangleShaderSource),
+            "DebugTriangle",
+            nullptr,
+            nullptr,
+            "VSMain",
+            "vs_4_0",
+            compileFlags,
+            0,
+            vertexShaderBlob.GetAddressOf(),
+            errorBlob.GetAddressOf()
+        );
+
+        if (FAILED(vertexCompileResult))
+        {
+            Core::Logger::Error("DX11Device", FormatHRESULT("Debug triangle vertex shader compile failed.", vertexCompileResult));
+            Core::Logger::Error("DX11Device", BlobToString(errorBlob.Get()));
+            return false;
+        }
+
+        errorBlob.Reset();
+
+        HRESULT pixelCompileResult = ::D3DCompile(
+            DebugTriangleShaderSource,
+            std::strlen(DebugTriangleShaderSource),
+            "DebugTriangle",
+            nullptr,
+            nullptr,
+            "PSMain",
+            "ps_4_0",
+            compileFlags,
+            0,
+            pixelShaderBlob.GetAddressOf(),
+            errorBlob.GetAddressOf()
+        );
+
+        if (FAILED(pixelCompileResult))
+        {
+            Core::Logger::Error("DX11Device", FormatHRESULT("Debug triangle pixel shader compile failed.", pixelCompileResult));
+            Core::Logger::Error("DX11Device", BlobToString(errorBlob.Get()));
+            return false;
+        }
+
+        const HRESULT vertexShaderResult = mDevice->CreateVertexShader(
+            vertexShaderBlob->GetBufferPointer(),
+            vertexShaderBlob->GetBufferSize(),
+            nullptr,
+            mDebugTriangleVertexShader.GetAddressOf()
+        );
+
+        if (FAILED(vertexShaderResult))
+        {
+            Core::Logger::Error("DX11Device", FormatHRESULT("CreateVertexShader failed.", vertexShaderResult));
+            return false;
+        }
+
+        const HRESULT pixelShaderResult = mDevice->CreatePixelShader(
+            pixelShaderBlob->GetBufferPointer(),
+            pixelShaderBlob->GetBufferSize(),
+            nullptr,
+            mDebugTrianglePixelShader.GetAddressOf()
+        );
+
+        if (FAILED(pixelShaderResult))
+        {
+            Core::Logger::Error("DX11Device", FormatHRESULT("CreatePixelShader failed.", pixelShaderResult));
+            return false;
+        }
+
+        Core::Logger::Info("DX11Device", "Debug triangle pipeline created.");
+
+        return true;
+    }
+
+    void DX11Device::ReleaseBackBufferResources()
+    {
+        mDepthStencilView.Reset();
+        mDepthStencilTexture.Reset();
+        mBackBufferRenderTargetView.Reset();
+    }
+
+    void DX11Device::ReleaseDebugTrianglePipeline()
+    {
+        mDebugTrianglePixelShader.Reset();
+        mDebugTriangleVertexShader.Reset();
     }
 
     Core::String DX11Device::FormatHRESULT(const char* message, const long result)
@@ -381,5 +655,16 @@ namespace Render
         text += buffer;
 
         return text;
+    }
+
+    Core::String DX11Device::BlobToString(ID3DBlob* blob)
+    {
+        if (blob == nullptr || blob->GetBufferPointer() == nullptr || blob->GetBufferSize() == 0)
+        {
+            return "No compiler error details.";
+        }
+
+        const char* text = static_cast<const char*>(blob->GetBufferPointer());
+        return Core::String(text, text + blob->GetBufferSize());
     }
 }

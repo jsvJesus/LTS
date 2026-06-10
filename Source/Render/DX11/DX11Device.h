@@ -51,6 +51,7 @@ namespace Render
         void Shutdown();
 
         void BeginFrame(const ClearColor& clearColor);
+        void DrawDebugTriangle();
         void EndFrame();
 
         bool Resize(Core::i32 width, Core::i32 height);
@@ -68,15 +69,27 @@ namespace Render
     private:
         bool CreateDeviceAndSwapChain(const DX11DeviceCreateInfo& createInfo, bool enableDebugLayer);
         bool CreateBackBufferRenderTarget();
-        void ReleaseBackBufferRenderTarget();
+        bool CreateDepthStencilBuffer();
+        bool CreateDebugTrianglePipeline();
+
+        void ReleaseBackBufferResources();
+        void ReleaseDebugTrianglePipeline();
 
         static Core::String FormatHRESULT(const char* message, long result);
+        static Core::String BlobToString(ID3DBlob* blob);
 
     private:
         Microsoft::WRL::ComPtr<ID3D11Device> mDevice;
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> mDeviceContext;
         Microsoft::WRL::ComPtr<IDXGISwapChain> mSwapChain;
+
         Microsoft::WRL::ComPtr<ID3D11RenderTargetView> mBackBufferRenderTargetView;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> mDepthStencilTexture;
+        Microsoft::WRL::ComPtr<ID3D11DepthStencilView> mDepthStencilView;
+
+        Microsoft::WRL::ComPtr<ID3D11VertexShader> mDebugTriangleVertexShader;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> mDebugTrianglePixelShader;
 
         void* mNativeWindowHandle = nullptr;
 
