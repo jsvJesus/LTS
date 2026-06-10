@@ -6,10 +6,17 @@ namespace Engine
 {
     struct FApplicationDesc
     {
+        const char* ApplicationName = "Application";
+        const char* LogDirectory = "Logs/Application";
+
         const wchar_t* Title = L"Application";
 
         std::uint32_t Width = 1280;
         std::uint32_t Height = 720;
+
+        bool EnableLogging = true;
+        bool LogToConsole = true;
+        bool LogToFile = true;
 
         bool EnableDebugRenderer = true;
         bool EnableVSync = true;
