@@ -3,8 +3,59 @@
 #include "../Platform/Window.h"
 #include "../Render/RenderSystem.h"
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#include <Windows.h>
+
 namespace Engine
 {
+    namespace
+    {
+        Core::String WideToUtf8(const wchar_t* value)
+        {
+            if (value == nullptr || value[0] == L'\0')
+                return "Application";
+
+            const int requiredSize = ::WideCharToMultiByte(
+                CP_UTF8,
+                0,
+                value,
+                -1,
+                nullptr,
+                0,
+                nullptr,
+                nullptr
+            );
+
+            if (requiredSize <= 0)
+                return "Application";
+
+            Core::String result;
+            result.resize(static_cast<std::size_t>(requiredSize - 1));
+
+            ::WideCharToMultiByte(
+                CP_UTF8,
+                0,
+                value,
+                -1,
+                result.data(),
+                requiredSize,
+                nullptr,
+                nullptr
+            );
+
+            return result;
+        }
+    }
+
+    EngineLoop::EngineLoop() = default;
+
     EngineLoop::~EngineLoop()
     {
         Shutdown();
@@ -16,7 +67,15 @@ namespace Engine
 
         mWindow = std::make_unique<Platform::Window>();
 
-        if (!mWindow->Create(desc.Title, desc.Width, desc.Height))
+        Platform::WindowCreateInfo windowInfo {};
+        windowInfo.Title = WideToUtf8(desc.Title);
+        windowInfo.Width = static_cast<Core::i32>(desc.Width);
+        windowInfo.Height = static_cast<Core::i32>(desc.Height);
+        windowInfo.StartCentered = true;
+        windowInfo.Resizable = true;
+        windowInfo.VisibleOnCreate = true;
+
+        if (!mWindow->Create(windowInfo))
         {
             Shutdown();
             return false;
@@ -24,8 +83,8 @@ namespace Engine
 
         Render::FRenderSystemDesc renderDesc {};
         renderDesc.NativeWindowHandle = mWindow->GetNativeHandle();
-        renderDesc.Width = mWindow->GetClientWidth();
-        renderDesc.Height = mWindow->GetClientHeight();
+        renderDesc.Width = static_cast<std::uint32_t>(mWindow->GetWidth());
+        renderDesc.Height = static_cast<std::uint32_t>(mWindow->GetHeight());
 
 #if defined(_DEBUG)
         renderDesc.EnableDebugLayer = true;
@@ -51,6 +110,7 @@ namespace Engine
 
         mLastFrameTime = std::chrono::steady_clock::now();
 
+        mFrameIndex = 0;
         mRunning = true;
         mInitialized = true;
 
@@ -64,7 +124,13 @@ namespace Engine
 
         while (mRunning)
         {
-            if (!mWindow->ProcessMessages())
+            if (!mWindow || !mWindow->PollEvents())
+            {
+                mRunning = false;
+                break;
+            }
+
+            if (mWindow->IsCloseRequested() || !mWindow->IsOpen())
             {
                 mRunning = false;
                 break;
@@ -141,11 +207,14 @@ namespace Engine
         if (!mWindow || !mRenderSystem)
             return;
 
-        const std::uint32_t width = mWindow->GetClientWidth();
-        const std::uint32_t height = mWindow->GetClientHeight();
+        const Core::i32 windowWidth = mWindow->GetWidth();
+        const Core::i32 windowHeight = mWindow->GetHeight();
 
-        if (width == 0 || height == 0)
+        if (windowWidth <= 0 || windowHeight <= 0)
             return;
+
+        const std::uint32_t width = static_cast<std::uint32_t>(windowWidth);
+        const std::uint32_t height = static_cast<std::uint32_t>(windowHeight);
 
         if (width == mRenderSystem->GetWidth() && height == mRenderSystem->GetHeight())
             return;

@@ -21,7 +21,7 @@ namespace Engine
     class EngineLoop final
     {
     public:
-        EngineLoop() = default;
+        EngineLoop();
         ~EngineLoop();
 
         EngineLoop(const EngineLoop&) = delete;

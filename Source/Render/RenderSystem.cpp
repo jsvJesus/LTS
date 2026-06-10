@@ -5,6 +5,8 @@
 
 namespace Render
 {
+    RenderSystem::RenderSystem() = default;
+    
     RenderSystem::~RenderSystem()
     {
         Shutdown();

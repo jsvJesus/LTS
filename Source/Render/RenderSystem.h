@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #include "RHI/RenderTypes.h"
@@ -12,7 +13,7 @@ namespace Render
     class RenderSystem final
     {
     public:
-        RenderSystem() = default;
+        RenderSystem();
         ~RenderSystem();
 
         RenderSystem(const RenderSystem&) = delete;

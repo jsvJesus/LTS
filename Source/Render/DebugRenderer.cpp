@@ -154,7 +154,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 
         hr = d3dDevice->CreateInputLayout(
             inputElements,
-            static_cast<UINT>(std::size(inputElements)),
+            static_cast<UINT>(sizeof(inputElements) / sizeof(inputElements[0])),
             vertexShaderBlob->GetBufferPointer(),
             vertexShaderBlob->GetBufferSize(),
             mInputLayout.GetAddressOf()

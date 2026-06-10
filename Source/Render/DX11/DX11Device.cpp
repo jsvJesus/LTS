@@ -11,11 +11,11 @@ namespace Render
     }
 
     bool DX11Device::Initialize(
-        void* nativeWindowHandle,
-        std::uint32_t width,
-        std::uint32_t height,
-        bool enableDebugLayer
-    )
+    void* nativeWindowHandle,
+    std::uint32_t width,
+    std::uint32_t height,
+    bool enableDebugLayer
+)
     {
         Shutdown();
 
@@ -24,6 +24,9 @@ namespace Render
 
         if (width == 0 || height == 0)
             return false;
+
+        mWidth = width;
+        mHeight = height;
 
         if (!CreateDeviceAndSwapChain(nativeWindowHandle, width, height, enableDebugLayer))
             return false;
@@ -40,8 +43,6 @@ namespace Render
             return false;
         }
 
-        mWidth = width;
-        mHeight = height;
         mInitialized = true;
 
         return true;
@@ -115,7 +116,7 @@ namespace Render
             nullptr,
             createFlags,
             featureLevels,
-            static_cast<UINT>(std::size(featureLevels)),
+            static_cast<UINT>(sizeof(featureLevels) / sizeof(featureLevels[0])),
             D3D11_SDK_VERSION,
             &swapChainDesc,
             mSwapChain.GetAddressOf(),
