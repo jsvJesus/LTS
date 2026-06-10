@@ -5,6 +5,9 @@
 #include <memory>
 
 #include "Engine.h"
+#include "FrameStats.h"
+
+#include "Core/BaseTypes.h"
 
 namespace Platform
 {
@@ -37,11 +40,21 @@ namespace Engine
         void RenderFrame(double deltaSeconds);
         void HandleResize();
 
+        void UpdateFrameStats(double deltaSeconds);
+        void UpdateWindowDebugTitle();
+
     private:
         bool mInitialized = false;
         bool mRunning = false;
 
+        bool mEnableFrameStatsTitle = true;
+        double mFrameStatsTitleUpdateIntervalSeconds = 0.5;
+
         std::uint64_t mFrameIndex = 0;
+
+        Core::String mBaseWindowTitle;
+
+        FrameStats mFrameStats;
 
         std::unique_ptr<Platform::Window> mWindow;
         std::unique_ptr<Platform::InputSystem> mInputSystem;

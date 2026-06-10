@@ -20,6 +20,9 @@ namespace Engine
 
         bool EnableDebugRenderer = true;
         bool EnableVSync = true;
+
+        bool EnableFrameStatsTitle = true;
+        double FrameStatsTitleUpdateIntervalSeconds = 0.5;
     };
 
     int RunWindowApplication(const FApplicationDesc& desc);

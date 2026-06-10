@@ -20,5 +20,8 @@ int main(int argc, char* argv[])
     appDesc.EnableDebugRenderer = true;
     appDesc.EnableVSync = true;
 
+    appDesc.EnableFrameStatsTitle = true;
+    appDesc.FrameStatsTitleUpdateIntervalSeconds = 0.5;
+
     return Engine::RunWindowApplication(appDesc);
 }

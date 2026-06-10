@@ -15,6 +15,9 @@
 
 #include <Windows.h>
 
+#include <iomanip>
+#include <sstream>
+
 namespace Engine
 {
     namespace
@@ -54,6 +57,60 @@ namespace Engine
 
             return result;
         }
+
+        Core::String BuildDebugTitle(
+            const Core::String& baseTitle,
+            const Core::i32 width,
+            const Core::i32 height,
+            const FFrameStatsSnapshot& stats
+        )
+        {
+            std::ostringstream stream;
+
+            stream << baseTitle
+                   << " | "
+                   << Core::GetBuildConfigurationName()
+                   << " | "
+                   << width
+                   << "x"
+                   << height
+                   << " | FPS: "
+                   << std::fixed
+                   << std::setprecision(1)
+                   << stats.FramesPerSecond
+                   << " | Frame: "
+                   << std::fixed
+                   << std::setprecision(2)
+                   << stats.AverageFrameMilliseconds
+                   << " ms";
+
+            return stream.str();
+        }
+
+        Core::String BuildFrameStatsLogLine(const FFrameStatsSnapshot& stats)
+        {
+            std::ostringstream stream;
+
+            stream << "FrameStats: "
+                   << "FrameIndex="
+                   << stats.FrameIndex
+                   << ", FPS="
+                   << std::fixed
+                   << std::setprecision(1)
+                   << stats.FramesPerSecond
+                   << ", AverageFrameMs="
+                   << std::fixed
+                   << std::setprecision(2)
+                   << stats.AverageFrameMilliseconds
+                   << ", LastFrameMs="
+                   << std::fixed
+                   << std::setprecision(2)
+                   << stats.LastFrameMilliseconds
+                   << ", FramesInSample="
+                   << stats.FramesInSample;
+
+            return stream.str();
+        }
     }
 
     EngineLoop::EngineLoop() = default;
@@ -67,10 +124,18 @@ namespace Engine
     {
         Shutdown();
 
+        mBaseWindowTitle = WideToUtf8(desc.Title);
+        mEnableFrameStatsTitle = desc.EnableFrameStatsTitle;
+        mFrameStatsTitleUpdateIntervalSeconds = desc.FrameStatsTitleUpdateIntervalSeconds > 0.01
+            ? desc.FrameStatsTitleUpdateIntervalSeconds
+            : 0.5;
+
+        mFrameStats.Reset();
+
         mWindow = std::make_unique<Platform::Window>();
 
         Platform::WindowCreateInfo windowInfo {};
-        windowInfo.Title = WideToUtf8(desc.Title);
+        windowInfo.Title = mBaseWindowTitle;
         windowInfo.Width = static_cast<Core::i32>(desc.Width);
         windowInfo.Height = static_cast<Core::i32>(desc.Height);
         windowInfo.StartCentered = true;
@@ -124,6 +189,8 @@ namespace Engine
         mRunning = true;
         mInitialized = true;
 
+        UpdateWindowDebugTitle();
+
         Core::Logger::Info("Engine", "Engine loop initialized.");
 
         return true;
@@ -166,6 +233,7 @@ namespace Engine
 
             Tick(deltaSeconds);
             RenderFrame(deltaSeconds);
+            UpdateFrameStats(deltaSeconds);
 
             ++mFrameIndex;
         }
@@ -195,6 +263,10 @@ namespace Engine
             mWindow.reset();
         }
 
+        mFrameStats.Reset();
+
+        mBaseWindowTitle.clear();
+
         mFrameIndex = 0;
         mInitialized = false;
     }
@@ -206,6 +278,11 @@ namespace Engine
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F1))
         {
             Core::Logger::Info("Input", "F1 pressed.");
+        }
+
+        if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F2))
+        {
+            Core::Logger::Info("Engine", BuildFrameStatsLogLine(mFrameStats.GetSnapshot()));
         }
 
         if (mInputSystem && mInputSystem->IsMouseButtonPressed(Platform::MouseButton::Left))
@@ -256,5 +333,35 @@ namespace Engine
             return;
 
         mRenderSystem->Resize(width, height);
+        UpdateWindowDebugTitle();
+    }
+
+    void EngineLoop::UpdateFrameStats(const double deltaSeconds)
+    {
+        const bool shouldUpdateTitle = mFrameStats.Update(
+            deltaSeconds,
+            mFrameIndex,
+            mFrameStatsTitleUpdateIntervalSeconds
+        );
+
+        if (shouldUpdateTitle)
+        {
+            UpdateWindowDebugTitle();
+        }
+    }
+
+    void EngineLoop::UpdateWindowDebugTitle()
+    {
+        if (!mEnableFrameStatsTitle || !mWindow)
+            return;
+
+        const Core::String title = BuildDebugTitle(
+            mBaseWindowTitle,
+            mWindow->GetWidth(),
+            mWindow->GetHeight(),
+            mFrameStats.GetSnapshot()
+        );
+
+        mWindow->SetTitle(title);
     }
 }

@@ -162,11 +162,13 @@
   <ItemGroup>
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="EngineLoop.cpp" />
+    <ClCompile Include="FrameStats.cpp" />
     <ClCompile Include="FrameTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.h" />
     <ClInclude Include="EngineLoop.h" />
+    <ClInclude Include="FrameStats.h" />
     <ClInclude Include="FrameTimer.h" />
   </ItemGroup>
   <ItemGroup>
