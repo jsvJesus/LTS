@@ -1,10 +1,7 @@
-#include "Engine/EngineLoop.h"
+#include "EngineLoop.h"
 
-#include "Core/Logger.h"
-
-#include <chrono>
-#include <string>
-#include <thread>
+#include "../Platform/Window.h"
+#include "../Render/RenderSystem.h"
 
 namespace Engine
 {
@@ -13,68 +10,49 @@ namespace Engine
         Shutdown();
     }
 
-    bool EngineLoop::Initialize(const EngineCreateInfo& createInfo)
+    bool EngineLoop::Initialize(const FApplicationDesc& desc)
     {
-        if (mInitialized)
+        Shutdown();
+
+        mWindow = std::make_unique<Platform::Window>();
+
+        if (!mWindow->Create(desc.Title, desc.Width, desc.Height))
         {
-            Core::Logger::Warning("EngineLoop", "Initialize called, but engine loop is already initialized.");
-            return true;
-        }
-
-        mCreateInfo = createInfo;
-
-        if (mCreateInfo.ApplicationName.empty())
-        {
-            mCreateInfo.ApplicationName = "Application";
-        }
-
-        if (mCreateInfo.TargetFrameRate == 0)
-        {
-            mCreateInfo.EnableFrameLimit = false;
-        }
-
-        Core::Logger::Info("EngineLoop", "Initializing engine loop.");
-        Core::Logger::Info("EngineLoop", "Application: " + mCreateInfo.ApplicationName);
-
-        if (!mMainWindow.Create(mCreateInfo.MainWindow))
-        {
-            Core::Logger::Fatal("EngineLoop", "Failed to create main window.");
+            Shutdown();
             return false;
         }
 
-        mMainWindow.Show();
+        Render::FRenderSystemDesc renderDesc {};
+        renderDesc.NativeWindowHandle = mWindow->GetNativeHandle();
+        renderDesc.Width = mWindow->GetClientWidth();
+        renderDesc.Height = mWindow->GetClientHeight();
 
-        if (mCreateInfo.EnableRendering)
+#if defined(_DEBUG)
+        renderDesc.EnableDebugLayer = true;
+#else
+        renderDesc.EnableDebugLayer = false;
+#endif
+
+        renderDesc.EnableDebugRenderer = desc.EnableDebugRenderer;
+        renderDesc.EnableVSync = desc.EnableVSync;
+
+        renderDesc.ClearColor.R = 0.015f;
+        renderDesc.ClearColor.G = 0.016f;
+        renderDesc.ClearColor.B = 0.020f;
+        renderDesc.ClearColor.A = 1.0f;
+
+        mRenderSystem = std::make_unique<Render::RenderSystem>();
+
+        if (!mRenderSystem->Initialize(renderDesc))
         {
-            Render::DX11DeviceCreateInfo renderCreateInfo;
-            renderCreateInfo.NativeWindowHandle = mMainWindow.GetNativeHandle();
-            renderCreateInfo.Width = mMainWindow.GetWidth();
-            renderCreateInfo.Height = mMainWindow.GetHeight();
-            renderCreateInfo.EnableVSync = mCreateInfo.EnableVSync;
-
-        #if defined(GAME_DEBUG)
-            renderCreateInfo.EnableDebugLayer = true;
-        #else
-            renderCreateInfo.EnableDebugLayer = false;
-        #endif
-
-            if (!mRenderDevice.Initialize(renderCreateInfo))
-            {
-                Core::Logger::Fatal("EngineLoop", "Failed to initialize render device.");
-                mMainWindow.Destroy();
-                return false;
-            }
-
-            mRenderInitialized = true;
+            Shutdown();
+            return false;
         }
 
-        mFrameTimer.Reset();
+        mLastFrameTime = std::chrono::steady_clock::now();
 
+        mRunning = true;
         mInitialized = true;
-        mRunning = false;
-        mShutdownRequested = false;
-
-        Core::Logger::Info("EngineLoop", "Engine loop initialized.");
 
         return true;
     }
@@ -82,148 +60,96 @@ namespace Engine
     int EngineLoop::Run()
     {
         if (!mInitialized)
+            return -1;
+
+        while (mRunning)
         {
-            Core::Logger::Fatal("EngineLoop", "Run called before Initialize.");
-            return 1;
-        }
-
-        Core::Logger::Info("EngineLoop", "Run started.");
-
-        mRunning = true;
-
-        while (mRunning && !mShutdownRequested)
-        {
-            if (!mMainWindow.PollEvents())
+            if (!mWindow->ProcessMessages())
             {
-                RequestShutdown();
+                mRunning = false;
                 break;
             }
 
-            mFrameTimer.Tick();
+            const auto currentTime = std::chrono::steady_clock::now();
 
-            Tick();
-            RenderFrame();
+            const std::chrono::duration<double> delta =
+                currentTime - mLastFrameTime;
 
-            SleepToFrameLimit();
+            mLastFrameTime = currentTime;
+
+            const double deltaSeconds = delta.count();
+
+            HandleResize();
+            Tick(deltaSeconds);
+            RenderFrame(deltaSeconds);
+
+            ++mFrameIndex;
         }
-
-        Core::Logger::Info("EngineLoop", "Run finished.");
-
-        Shutdown();
 
         return 0;
     }
 
     void EngineLoop::Shutdown()
     {
-        if (!mInitialized)
-        {
-            return;
-        }
-
-        Core::Logger::Info("EngineLoop", "Shutdown started.");
-
         mRunning = false;
-        mShutdownRequested = true;
 
-        if (mRenderInitialized)
+        if (mRenderSystem)
         {
-            mRenderDevice.Shutdown();
-            mRenderInitialized = false;
+            mRenderSystem->Shutdown();
+            mRenderSystem.reset();
         }
 
-        mMainWindow.Destroy();
+        if (mWindow)
+        {
+            mWindow->Destroy();
+            mWindow.reset();
+        }
 
+        mFrameIndex = 0;
         mInitialized = false;
-
-        Core::Logger::Info("EngineLoop", "Shutdown finished.");
     }
 
-    void EngineLoop::RequestShutdown()
+    void EngineLoop::Tick(double deltaSeconds)
     {
-        mShutdownRequested = true;
-        mRunning = false;
+        (void)deltaSeconds;
+
+        // Позже тут будут:
+        // input update
+        // world tick
+        // editor tick
+        // game tick
     }
 
-    bool EngineLoop::IsInitialized() const
+    void EngineLoop::RenderFrame(double deltaSeconds)
     {
-        return mInitialized;
-    }
-
-    bool EngineLoop::IsRunning() const
-    {
-        return mRunning;
-    }
-
-    bool EngineLoop::IsShutdownRequested() const
-    {
-        return mShutdownRequested;
-    }
-
-    const FrameTimer& EngineLoop::GetFrameTimer() const
-    {
-        return mFrameTimer;
-    }
-
-    Platform::Window& EngineLoop::GetMainWindow()
-    {
-        return mMainWindow;
-    }
-
-    Render::DX11Device& EngineLoop::GetRenderDevice()
-    {
-        return mRenderDevice;
-    }
-
-    void EngineLoop::Tick()
-    {
-        // Game / Editor update будет здесь.
-        // Сейчас главный результат — стабильный loop + render clear.
-    }
-
-    void EngineLoop::RenderFrame()
-    {
-        if (!mRenderInitialized)
-        {
+        if (!mRenderSystem)
             return;
-        }
 
-        if (!mRenderDevice.ResizeIfNeeded(
-            mMainWindow.GetWidth(),
-            mMainWindow.GetHeight()
-        ))
-        {
-            return;
-        }
+        Render::FRenderFrameInfo frameInfo {};
+        frameInfo.DeltaSeconds = deltaSeconds;
+        frameInfo.FrameIndex = mFrameIndex;
 
-        mRenderDevice.BeginFrame(mCreateInfo.ClearColor);
-        mRenderDevice.DrawDebugTriangle();
-        mRenderDevice.EndFrame();
+        mRenderSystem->BeginFrame(frameInfo);
+
+        mRenderSystem->RenderDebug();
+
+        mRenderSystem->EndFrame();
     }
 
-    void EngineLoop::SleepToFrameLimit()
+    void EngineLoop::HandleResize()
     {
-        if (!mCreateInfo.EnableFrameLimit || mCreateInfo.TargetFrameRate == 0)
-        {
+        if (!mWindow || !mRenderSystem)
             return;
-        }
 
-        const Core::f64 targetFrameSeconds = 1.0 / static_cast<Core::f64>(mCreateInfo.TargetFrameRate);
-        const Core::f64 deltaSeconds = mFrameTimer.GetDeltaSeconds();
+        const std::uint32_t width = mWindow->GetClientWidth();
+        const std::uint32_t height = mWindow->GetClientHeight();
 
-        if (deltaSeconds >= targetFrameSeconds)
-        {
+        if (width == 0 || height == 0)
             return;
-        }
 
-        const Core::f64 sleepSeconds = targetFrameSeconds - deltaSeconds;
-
-        if (sleepSeconds <= 0.0)
-        {
+        if (width == mRenderSystem->GetWidth() && height == mRenderSystem->GetHeight())
             return;
-        }
 
-        const auto sleepDuration = std::chrono::duration<Core::f64>(sleepSeconds);
-        std::this_thread::sleep_for(sleepDuration);
+        mRenderSystem->Resize(width, height);
     }
 }

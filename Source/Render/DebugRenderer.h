@@ -1,0 +1,39 @@
+#pragma once
+
+#include <d3d11.h>
+#include <wrl/client.h>
+
+namespace Render
+{
+    class DX11Device;
+
+    class DebugRenderer final
+    {
+    public:
+        DebugRenderer() = default;
+        ~DebugRenderer();
+
+        DebugRenderer(const DebugRenderer&) = delete;
+        DebugRenderer& operator=(const DebugRenderer&) = delete;
+
+        bool Initialize(DX11Device& device);
+        void Shutdown();
+
+        void DrawDebugTriangle(DX11Device& device);
+
+    private:
+        struct FDebugVertex
+        {
+            float Position[3];
+            float Color[4];
+        };
+
+    private:
+        bool mInitialized = false;
+
+        Microsoft::WRL::ComPtr<ID3D11VertexShader> mVertexShader;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader> mPixelShader;
+        Microsoft::WRL::ComPtr<ID3D11InputLayout> mInputLayout;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> mVertexBuffer;
+    };
+}

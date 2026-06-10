@@ -1,27 +1,25 @@
 #pragma once
 
-#include "Core/BaseTypes.h"
-#include "Platform/Window.h"
-#include "Render/DX11/DX11Device.h"
+#include <cstdint>
 
 namespace Engine
 {
-    struct EngineCreateInfo final
+    struct FApplicationDesc
     {
-        Core::String ApplicationName = "Application";
-        Core::Path LogDirectory = "Logs/Application";
+        const wchar_t* Title = L"Application";
 
-        Platform::WindowCreateInfo MainWindow;
+        std::uint32_t Width = 1280;
+        std::uint32_t Height = 720;
 
-        bool EnableRendering = true;
-        bool EnableFrameLimit = true;
-
+        bool EnableDebugRenderer = true;
         bool EnableVSync = true;
-
-        Core::u32 TargetFrameRate = 60;
-
-        Render::ClearColor ClearColor;
     };
 
-    int RunWindowApplication(const EngineCreateInfo& createInfo);
+    int RunWindowApplication(const FApplicationDesc& desc);
+
+    int RunWindowApplication(
+        const wchar_t* title,
+        std::uint32_t width,
+        std::uint32_t height
+    );
 }

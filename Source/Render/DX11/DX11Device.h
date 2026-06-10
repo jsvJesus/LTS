@@ -1,40 +1,15 @@
 #pragma once
 
-#include "Core/BaseTypes.h"
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
+#include <cstdint>
 
 #include <d3d11.h>
 #include <dxgi.h>
 #include <wrl/client.h>
 
+#include "../RHI/RenderTypes.h"
+
 namespace Render
 {
-    struct DX11DeviceCreateInfo final
-    {
-        void* NativeWindowHandle = nullptr;
-
-        Core::i32 Width = 1280;
-        Core::i32 Height = 720;
-
-        bool EnableDebugLayer = false;
-        bool EnableVSync = true;
-    };
-
-    struct ClearColor final
-    {
-        Core::f32 R = 0.05f;
-        Core::f32 G = 0.07f;
-        Core::f32 B = 0.09f;
-        Core::f32 A = 1.0f;
-    };
-
     class DX11Device final
     {
     public:
@@ -42,61 +17,58 @@ namespace Render
         ~DX11Device();
 
         DX11Device(const DX11Device&) = delete;
-        DX11Device(DX11Device&&) = delete;
-
         DX11Device& operator=(const DX11Device&) = delete;
-        DX11Device& operator=(DX11Device&&) = delete;
 
-        bool Initialize(const DX11DeviceCreateInfo& createInfo);
+        bool Initialize(
+            void* nativeWindowHandle,
+            std::uint32_t width,
+            std::uint32_t height,
+            bool enableDebugLayer
+        );
+
         void Shutdown();
 
-        void BeginFrame(const ClearColor& clearColor);
-        void DrawDebugTriangle();
-        void EndFrame();
+        void BeginFrame(const FRenderColor& clearColor);
+        void Present(bool enableVSync);
 
-        bool Resize(Core::i32 width, Core::i32 height);
-        bool ResizeIfNeeded(Core::i32 width, Core::i32 height);
+        bool Resize(std::uint32_t width, std::uint32_t height);
 
-        [[nodiscard]] bool IsInitialized() const;
+        bool IsInitialized() const { return mInitialized; }
 
-        [[nodiscard]] Core::i32 GetBackBufferWidth() const;
-        [[nodiscard]] Core::i32 GetBackBufferHeight() const;
+        std::uint32_t GetWidth() const { return mWidth; }
+        std::uint32_t GetHeight() const { return mHeight; }
 
-        [[nodiscard]] ID3D11Device* GetDevice() const;
-        [[nodiscard]] ID3D11DeviceContext* GetDeviceContext() const;
-        [[nodiscard]] IDXGISwapChain* GetSwapChain() const;
+        ID3D11Device* GetDevice() const { return mDevice.Get(); }
+        ID3D11DeviceContext* GetContext() const { return mContext.Get(); }
+
+        ID3D11RenderTargetView* GetBackBufferRenderTargetView() const { return mBackBufferRTV.Get(); }
+        ID3D11DepthStencilView* GetDepthStencilView() const { return mDepthStencilView.Get(); }
 
     private:
-        bool CreateDeviceAndSwapChain(const DX11DeviceCreateInfo& createInfo, bool enableDebugLayer);
-        bool CreateBackBufferRenderTarget();
-        bool CreateDepthStencilBuffer();
-        bool CreateDebugTrianglePipeline();
+        bool CreateDeviceAndSwapChain(
+            void* nativeWindowHandle,
+            std::uint32_t width,
+            std::uint32_t height,
+            bool enableDebugLayer
+        );
+
+        bool CreateBackBufferResources();
+        bool CreateDepthStencilResources();
 
         void ReleaseBackBufferResources();
-        void ReleaseDebugTrianglePipeline();
-
-        static Core::String FormatHRESULT(const char* message, long result);
-        static Core::String BlobToString(ID3DBlob* blob);
 
     private:
+        bool mInitialized = false;
+
+        std::uint32_t mWidth = 0;
+        std::uint32_t mHeight = 0;
+
         Microsoft::WRL::ComPtr<ID3D11Device> mDevice;
-        Microsoft::WRL::ComPtr<ID3D11DeviceContext> mDeviceContext;
+        Microsoft::WRL::ComPtr<ID3D11DeviceContext> mContext;
         Microsoft::WRL::ComPtr<IDXGISwapChain> mSwapChain;
 
-        Microsoft::WRL::ComPtr<ID3D11RenderTargetView> mBackBufferRenderTargetView;
-
-        Microsoft::WRL::ComPtr<ID3D11Texture2D> mDepthStencilTexture;
+        Microsoft::WRL::ComPtr<ID3D11RenderTargetView> mBackBufferRTV;
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> mDepthStencilBuffer;
         Microsoft::WRL::ComPtr<ID3D11DepthStencilView> mDepthStencilView;
-
-        Microsoft::WRL::ComPtr<ID3D11VertexShader> mDebugTriangleVertexShader;
-        Microsoft::WRL::ComPtr<ID3D11PixelShader> mDebugTrianglePixelShader;
-
-        void* mNativeWindowHandle = nullptr;
-
-        Core::i32 mBackBufferWidth = 0;
-        Core::i32 mBackBufferHeight = 0;
-
-        bool mInitialized = false;
-        bool mEnableVSync = true;
     };
 }

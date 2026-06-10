@@ -1,42 +1,34 @@
-#include "Engine/Engine.h"
+#include "Engine.h"
 
-#include "Core/Logger.h"
-#include "Engine/EngineLoop.h"
+#include "EngineLoop.h"
 
 namespace Engine
 {
-    int RunWindowApplication(const EngineCreateInfo& createInfo)
+    int RunWindowApplication(const FApplicationDesc& desc)
     {
-        Core::LoggerConfig loggerConfig;
-        loggerConfig.ApplicationName = createInfo.ApplicationName;
-        loggerConfig.LogDirectory = createInfo.LogDirectory;
-        loggerConfig.WriteToConsole = true;
-        loggerConfig.WriteToFile = true;
-        loggerConfig.FlushEachMessage = true;
+        EngineLoop loop;
 
-        Core::Logger::Initialize(loggerConfig);
+        if (!loop.Initialize(desc))
+            return -1;
 
-        Core::Logger::Info("Engine", "Application boot started.");
+        const int result = loop.Run();
 
-        EngineLoop engineLoop;
+        loop.Shutdown();
 
-        if (!engineLoop.Initialize(createInfo))
-        {
-            Core::Logger::Fatal("Engine", "Application initialization failed.");
-            Core::Logger::Shutdown();
-            return 1;
-        }
-
-        const int exitCode = engineLoop.Run();
-
-        Core::Logger::Info("Engine", "Application boot finished.");
-
-        Core::Logger::Shutdown();
-
-        return exitCode;
+        return result;
     }
 
-    void EngineModuleAnchor()
+    int RunWindowApplication(
+        const wchar_t* title,
+        std::uint32_t width,
+        std::uint32_t height
+    )
     {
+        FApplicationDesc desc {};
+        desc.Title = title;
+        desc.Width = width;
+        desc.Height = height;
+
+        return RunWindowApplication(desc);
     }
 }
