@@ -1,3 +1,8 @@
+#include "Platform/Window.h"
 
-// TODO: write your library functions here
-
+namespace Platform
+{
+    void PlatformModuleAnchor()
+    {
+    }
+}
