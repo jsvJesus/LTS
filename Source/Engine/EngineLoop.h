@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "Engine.h"
+#include "FrameLimiter.h"
 #include "FrameStats.h"
 
 #include "Core/BaseTypes.h"
@@ -43,6 +44,9 @@ namespace Engine
         void UpdateFrameStats(double deltaSeconds);
         void UpdateWindowDebugTitle();
 
+        void LogFrameLimiterState() const;
+        Core::String BuildFrameLimiterLogLine() const;
+
     private:
         bool mInitialized = false;
         bool mRunning = false;
@@ -55,6 +59,7 @@ namespace Engine
         Core::String mBaseWindowTitle;
 
         FrameStats mFrameStats;
+        FrameLimiter mFrameLimiter;
 
         std::unique_ptr<Platform::Window> mWindow;
         std::unique_ptr<Platform::InputSystem> mInputSystem;

@@ -23,5 +23,8 @@ int main(int argc, char* argv[])
     appDesc.EnableFrameStatsTitle = true;
     appDesc.FrameStatsTitleUpdateIntervalSeconds = 0.5;
 
+    appDesc.EnableFrameLimit = false;
+    appDesc.TargetFrameRate = 144.0;
+
     return Engine::RunWindowApplication(appDesc);
 }

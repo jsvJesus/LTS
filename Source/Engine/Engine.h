@@ -23,6 +23,9 @@ namespace Engine
 
         bool EnableFrameStatsTitle = true;
         double FrameStatsTitleUpdateIntervalSeconds = 0.5;
+
+        bool EnableFrameLimit = false;
+        double TargetFrameRate = 144.0;
     };
 
     int RunWindowApplication(const FApplicationDesc& desc);

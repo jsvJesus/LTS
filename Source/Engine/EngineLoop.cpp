@@ -62,7 +62,8 @@ namespace Engine
             const Core::String& baseTitle,
             const Core::i32 width,
             const Core::i32 height,
-            const FFrameStatsSnapshot& stats
+            const FFrameStatsSnapshot& stats,
+            const FFrameLimiterSnapshot& limiter
         )
         {
             std::ostringstream stream;
@@ -83,6 +84,18 @@ namespace Engine
                    << std::setprecision(2)
                    << stats.AverageFrameMilliseconds
                    << " ms";
+
+            if (limiter.Enabled)
+            {
+                stream << " | Limit: "
+                       << std::fixed
+                       << std::setprecision(0)
+                       << limiter.TargetFrameRate;
+            }
+            else
+            {
+                stream << " | Limit: Off";
+            }
 
             return stream.str();
         }
@@ -131,6 +144,7 @@ namespace Engine
             : 0.5;
 
         mFrameStats.Reset();
+        mFrameLimiter.Configure(desc.EnableFrameLimit, desc.TargetFrameRate);
 
         mWindow = std::make_unique<Platform::Window>();
 
@@ -192,6 +206,7 @@ namespace Engine
         UpdateWindowDebugTitle();
 
         Core::Logger::Info("Engine", "Engine loop initialized.");
+        LogFrameLimiterState();
 
         return true;
     }
@@ -203,6 +218,8 @@ namespace Engine
 
         while (mRunning)
         {
+            const auto frameStartTime = std::chrono::steady_clock::now();
+
             if (!mWindow || !mWindow->PollEvents())
             {
                 mRunning = false;
@@ -215,12 +232,10 @@ namespace Engine
                 break;
             }
 
-            const auto currentTime = std::chrono::steady_clock::now();
-
             const std::chrono::duration<double> delta =
-                currentTime - mLastFrameTime;
+                frameStartTime - mLastFrameTime;
 
-            mLastFrameTime = currentTime;
+            mLastFrameTime = frameStartTime;
 
             const double deltaSeconds = delta.count();
 
@@ -236,6 +251,8 @@ namespace Engine
             UpdateFrameStats(deltaSeconds);
 
             ++mFrameIndex;
+
+            mFrameLimiter.WaitIfNeeded(frameStartTime);
         }
 
         return 0;
@@ -264,6 +281,7 @@ namespace Engine
         }
 
         mFrameStats.Reset();
+        mFrameLimiter.Reset();
 
         mBaseWindowTitle.clear();
 
@@ -283,6 +301,14 @@ namespace Engine
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F2))
         {
             Core::Logger::Info("Engine", BuildFrameStatsLogLine(mFrameStats.GetSnapshot()));
+            Core::Logger::Info("Engine", BuildFrameLimiterLogLine());
+        }
+
+        if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F3))
+        {
+            mFrameLimiter.ToggleEnabled();
+            LogFrameLimiterState();
+            UpdateWindowDebugTitle();
         }
 
         if (mInputSystem && mInputSystem->IsMouseButtonPressed(Platform::MouseButton::Left))
@@ -359,9 +385,40 @@ namespace Engine
             mBaseWindowTitle,
             mWindow->GetWidth(),
             mWindow->GetHeight(),
-            mFrameStats.GetSnapshot()
+            mFrameStats.GetSnapshot(),
+            mFrameLimiter.GetSnapshot()
         );
 
         mWindow->SetTitle(title);
+    }
+
+    void EngineLoop::LogFrameLimiterState() const
+    {
+        Core::Logger::Info("Engine", BuildFrameLimiterLogLine());
+    }
+
+    Core::String EngineLoop::BuildFrameLimiterLogLine() const
+    {
+        const FFrameLimiterSnapshot& limiter = mFrameLimiter.GetSnapshot();
+
+        std::ostringstream stream;
+
+        stream << "FrameLimiter: "
+               << "Enabled="
+               << (limiter.Enabled ? "true" : "false")
+               << ", TargetFPS="
+               << std::fixed
+               << std::setprecision(1)
+               << limiter.TargetFrameRate
+               << ", TargetFrameMs="
+               << std::fixed
+               << std::setprecision(2)
+               << limiter.TargetFrameMilliseconds
+               << ", LastSleepMs="
+               << std::fixed
+               << std::setprecision(2)
+               << limiter.LastSleepMilliseconds;
+
+        return stream.str();
     }
 }
