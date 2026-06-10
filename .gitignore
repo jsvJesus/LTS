@@ -1,0 +1,206 @@
+# =========================================================
+# Rider / JetBrains
+# =========================================================
+
+.idea/
+*.sln.iml
+*.DotSettings.user
+
+
+# =========================================================
+# Visual Studio / MSBuild
+# =========================================================
+
+.vs/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+ipch/
+*.VC.db
+*.VC.VC.opendb
+Browse.VC.db
+
+
+# =========================================================
+# Build output
+# =========================================================
+
+Bin/
+Intermediate/
+
+[Dd]ebug/
+[Rr]elease/
+[Ff]inal/
+x64/
+x86/
+
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.obj
+*.pch
+*.idb
+*.ipdb
+*.iobj
+*.lastbuildstate
+*.tlog
+*.log
+
+
+# =========================================================
+# C++ generated files
+# =========================================================
+
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.db
+
+
+# =========================================================
+# .NET / C#
+# =========================================================
+
+bin/
+obj/
+
+*.nupkg
+*.snupkg
+project.assets.json
+project.nuget.cache
+*.csproj.nuget.dgspec.json
+*.csproj.nuget.g.props
+*.csproj.nuget.g.targets
+
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+
+# =========================================================
+# Avalonia / UI temporary files
+# =========================================================
+
+*.axaml.cs.bak
+*.xaml.cs.bak
+
+
+# =========================================================
+# NuGet packages
+# =========================================================
+
+packages/
+.nuget/
+
+
+# =========================================================
+# Content / generated game assets
+# =========================================================
+
+Content/Compiled/
+Build/Packages/
+
+*.mesh
+*.tex
+*.matbin
+*.skel
+*.anim
+*.mapbin
+*.pkg
+
+
+# =========================================================
+# Do NOT ignore raw/imported assets by default
+# We keep them tracked unless later they become too heavy
+# =========================================================
+
+!Content/Raw/
+!Content/Imported/
+
+
+# =========================================================
+# Logs / crash dumps
+# =========================================================
+
+Logs/
+CrashDumps/
+Dumps/
+
+*.dmp
+*.mdmp
+*.stackdump
+
+
+# =========================================================
+# OS files
+# =========================================================
+
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+
+# =========================================================
+# Archives / temporary files
+# =========================================================
+
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+
+
+# =========================================================
+# Local environment
+# =========================================================
+
+.env
+.env.*
+!.env.example
+
+local.settings.json
+appsettings.Local.json
+appsettings.Development.local.json
+
+
+# =========================================================
+# External dependencies
+# =========================================================
+
+External/Bin/
+External/Temp/
+External/Cache/
+
+# Keep headers/libs if we manually add SDK files later
+!External/Include/
+!External/Lib/
+
+
+# =========================================================
+# Database / backend local files
+# =========================================================
+
+*.db
+*.sqlite
+*.sqlite3
+
+MariaDBData/
+DatabaseDumps/
