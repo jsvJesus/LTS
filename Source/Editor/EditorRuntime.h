@@ -1,14 +1,18 @@
 #pragma once
 
+#include <memory>
+
 #include "Engine/ApplicationRuntime.h"
+
+#include "EditorViewportController.h"
 
 namespace Editor
 {
     class LevelEditorRuntime final : public Engine::IApplicationRuntime
     {
     public:
-        LevelEditorRuntime() = default;
-        ~LevelEditorRuntime() override = default;
+        LevelEditorRuntime();
+        ~LevelEditorRuntime() override;
 
         LevelEditorRuntime(const LevelEditorRuntime&) = delete;
         LevelEditorRuntime& operator=(const LevelEditorRuntime&) = delete;
@@ -25,6 +29,9 @@ namespace Editor
 
     private:
         Engine::FApplicationRuntimeContext mContext {};
+
+        std::unique_ptr<EditorViewportController> mViewportController;
+
         bool mInitialized = false;
     };
 }

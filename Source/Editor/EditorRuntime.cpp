@@ -1,28 +1,12 @@
 #include "EditorRuntime.h"
 
-#include "Engine/Camera/Camera.h"
-#include "Render/RenderSystem.h"
+#include "EditorViewportController.h"
 
 namespace Editor
 {
-    namespace
-    {
-        Render::FRenderColor MakeColor(
-            const float r,
-            const float g,
-            const float b,
-            const float a
-        )
-        {
-            Render::FRenderColor color {};
-            color.R = r;
-            color.G = g;
-            color.B = b;
-            color.A = a;
-            return color;
-        }
-    }
-
+    LevelEditorRuntime::LevelEditorRuntime() = default;
+    LevelEditorRuntime::~LevelEditorRuntime() = default;
+    
     const char* LevelEditorRuntime::GetRuntimeName() const
     {
         return "LevelEditorRuntime";
@@ -38,25 +22,50 @@ namespace Editor
             return false;
         }
 
+        mViewportController = std::make_unique<EditorViewportController>();
+
+        FEditorViewportControllerDesc viewportDesc {};
+        viewportDesc.EnableViewportCamera = true;
+        viewportDesc.EnableDebugOverlay = true;
+        viewportDesc.DrawFocusMarker = true;
+        viewportDesc.DrawCameraForwardLine = true;
+        viewportDesc.FocusDistance = 5.0f;
+        viewportDesc.FocusMarkerSize = 0.35f;
+
+        if (!mViewportController->Initialize(mContext, viewportDesc))
+        {
+            mViewportController.reset();
+            mInitialized = false;
+            return false;
+        }
+
         mInitialized = true;
         return true;
     }
 
     void LevelEditorRuntime::Shutdown()
     {
+        if (mViewportController)
+        {
+            mViewportController->Shutdown();
+            mViewportController.reset();
+        }
+
         mContext = Engine::FApplicationRuntimeContext {};
         mInitialized = false;
     }
 
     void LevelEditorRuntime::Tick(const double deltaSeconds)
     {
-        (void)deltaSeconds;
-
         if (!mInitialized)
             return;
 
+        if (mViewportController)
+        {
+            mViewportController->Tick(deltaSeconds);
+        }
+
         // Позже тут будут:
-        // editor viewport tick
         // selection tick
         // gizmo tick
         // editor tools tick
@@ -64,49 +73,12 @@ namespace Editor
 
     void LevelEditorRuntime::RenderDebug()
     {
-        if (!mInitialized || !mContext.RenderSystem)
+        if (!mInitialized)
             return;
 
-        const Render::FRenderColor editorAccentColor =
-            MakeColor(0.10f, 0.85f, 1.00f, 1.0f);
-
-        const Render::FRenderColor editorSoftColor =
-            MakeColor(0.08f, 0.45f, 0.55f, 1.0f);
-
-        mContext.RenderSystem->DrawDebugLine(
-            Core::Vector3(-2.0f, 0.04f, -2.0f),
-            Core::Vector3( 2.0f, 0.04f,  2.0f),
-            editorAccentColor
-        );
-
-        mContext.RenderSystem->DrawDebugLine(
-            Core::Vector3(-2.0f, 0.04f,  2.0f),
-            Core::Vector3( 2.0f, 0.04f, -2.0f),
-            editorAccentColor
-        );
-
-        mContext.RenderSystem->DrawDebugLine(
-            Core::Vector3(-1.0f, 0.05f, 0.0f),
-            Core::Vector3( 1.0f, 0.05f, 0.0f),
-            editorSoftColor
-        );
-
-        mContext.RenderSystem->DrawDebugLine(
-            Core::Vector3(0.0f, 0.05f, -1.0f),
-            Core::Vector3(0.0f, 0.05f,  1.0f),
-            editorSoftColor
-        );
-
-        if (mContext.MainCamera)
+        if (mViewportController)
         {
-            const Core::Vector3 cameraPosition = mContext.MainCamera->GetPosition();
-            const Core::Vector3 cameraForward = mContext.MainCamera->GetForwardVector();
-
-            mContext.RenderSystem->DrawDebugLine(
-                cameraPosition + cameraForward * 0.5f,
-                cameraPosition + cameraForward * 3.0f,
-                editorAccentColor
-            );
+            mViewportController->RenderDebug();
         }
     }
 }

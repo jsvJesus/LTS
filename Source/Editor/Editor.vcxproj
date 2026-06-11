@@ -255,9 +255,11 @@
             </AdditionalIncludeDirectories>
       <LibCompiled>true</LibCompiled>
     </ClCompile>
+    <ClCompile Include="EditorViewportController.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EditorRuntime.h" />
+    <ClInclude Include="EditorViewportController.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
