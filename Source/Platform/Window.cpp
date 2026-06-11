@@ -1,6 +1,7 @@
 #include "Platform/Window.h"
 
 #include "Core/Logger.h"
+#include "Platform/Input.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -436,6 +437,10 @@ namespace Platform
                 window->mHeight = static_cast<Core::i32>(HIWORD(lParam));
             }
             return 0;
+
+        case WM_INPUT:
+            InputSystem::ProcessRawInputMessage(reinterpret_cast<void*>(lParam));
+            break;
 
         default:
             break;

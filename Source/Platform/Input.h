@@ -116,6 +116,13 @@ namespace Platform
         Count
     };
 
+    enum class CursorMode : Core::u8
+    {
+        Normal = 0,
+        Hidden,
+        Locked
+    };
+
     class InputSystem final
     {
     public:
@@ -146,7 +153,20 @@ namespace Platform
         [[nodiscard]] Core::i32 GetMouseDeltaX() const { return mMouseDeltaX; }
         [[nodiscard]] Core::i32 GetMouseDeltaY() const { return mMouseDeltaY; }
 
+        [[nodiscard]] Core::i32 GetRawMouseDeltaX() const { return mRawMouseDeltaX; }
+        [[nodiscard]] Core::i32 GetRawMouseDeltaY() const { return mRawMouseDeltaY; }
+
         [[nodiscard]] bool HasMousePosition() const { return mHasMousePosition; }
+        [[nodiscard]] bool IsRawMouseInputAvailable() const { return mRawMouseInputAvailable; }
+
+        void SetCursorMode(CursorMode mode);
+        void ToggleCursorLock();
+
+        [[nodiscard]] CursorMode GetCursorMode() const { return mCursorMode; }
+        [[nodiscard]] bool IsCursorLocked() const { return mCursorMode == CursorMode::Locked; }
+        [[nodiscard]] bool IsCursorHidden() const { return mCursorMode == CursorMode::Hidden || mCursorMode == CursorMode::Locked; }
+
+        static void ProcessRawInputMessage(void* rawInputHandle);
 
     private:
         static constexpr std::size_t KeyCount = 256;
@@ -156,6 +176,16 @@ namespace Platform
         void UpdateKeyboard();
         void UpdateMouseButtons();
         void UpdateMousePosition();
+        void UpdateRawMouseDelta();
+
+        bool RegisterRawMouseInput();
+        void UnregisterRawMouseInput();
+        void HandleRawInputMessage(void* rawInputHandle);
+
+        void ApplyCursorMode();
+        void ApplyCursorVisibility(bool visible);
+        void UpdateCursorClip();
+        void ReleaseCursorClip();
 
         void ClearCurrentState();
         void ClearAllState();
@@ -179,6 +209,18 @@ namespace Platform
         Core::i32 mMouseDeltaX = 0;
         Core::i32 mMouseDeltaY = 0;
 
+        Core::i32 mRawMouseDeltaX = 0;
+        Core::i32 mRawMouseDeltaY = 0;
+
+        Core::i32 mPendingRawMouseDeltaX = 0;
+        Core::i32 mPendingRawMouseDeltaY = 0;
+
         bool mHasMousePosition = false;
+        bool mRawMouseInputAvailable = false;
+
+        CursorMode mCursorMode = CursorMode::Normal;
+
+        bool mCursorCurrentlyVisible = true;
+        bool mCursorCurrentlyClipped = false;
     };
 }

@@ -50,6 +50,9 @@ namespace Engine
         void ToggleDebugRendering();
         Core::String BuildDebugRenderingLogLine() const;
 
+        void ToggleCursorLock();
+        Core::String BuildInputDebugLogLine() const;
+
     private:
         bool mInitialized = false;
         bool mRunning = false;

@@ -68,13 +68,32 @@ namespace Engine
             return result;
         }
 
+        Core::StringView GetCursorModeName(const Platform::CursorMode mode)
+        {
+            switch (mode)
+            {
+            case Platform::CursorMode::Normal:
+                return "Normal";
+
+            case Platform::CursorMode::Hidden:
+                return "Hidden";
+
+            case Platform::CursorMode::Locked:
+                return "Locked";
+
+            default:
+                return "Unknown";
+            }
+        }
+
         Core::String BuildDebugTitle(
             const Core::String& baseTitle,
             const Core::i32 width,
             const Core::i32 height,
             const FFrameStatsSnapshot& stats,
             const FFrameLimiterSnapshot& limiter,
-            const bool debugRenderingEnabled
+            const bool debugRenderingEnabled,
+            const Platform::CursorMode cursorMode
         )
         {
             std::ostringstream stream;
@@ -110,6 +129,9 @@ namespace Engine
 
             stream << " | DebugDraw: "
                    << (debugRenderingEnabled ? "On" : "Off");
+
+            stream << " | Cursor: "
+                   << GetCursorModeName(cursorMode);
 
             return stream.str();
         }
@@ -315,6 +337,7 @@ namespace Engine
             Core::Logger::Info("Engine", BuildFrameStatsLogLine(mFrameStats.GetSnapshot()));
             Core::Logger::Info("Engine", BuildFrameLimiterLogLine());
             Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
+            Core::Logger::Info("Input", BuildInputDebugLogLine());
         }
 
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F3))
@@ -327,6 +350,10 @@ namespace Engine
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F4))
         {
             ToggleDebugRendering();
+        }
+        if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F5))
+        {
+            ToggleCursorLock();
         }
 
         if (mInputSystem && mInputSystem->IsMouseButtonPressed(Platform::MouseButton::Left))
@@ -402,13 +429,17 @@ namespace Engine
         const bool debugRenderingEnabled =
             mRenderSystem && mRenderSystem->IsDebugRenderingEnabled();
 
+        const Platform::CursorMode cursorMode =
+            mInputSystem ? mInputSystem->GetCursorMode() : Platform::CursorMode::Normal;
+
         const Core::String title = BuildDebugTitle(
             mBaseWindowTitle,
             mWindow->GetWidth(),
             mWindow->GetHeight(),
             mFrameStats.GetSnapshot(),
             mFrameLimiter.GetSnapshot(),
-            debugRenderingEnabled
+            debugRenderingEnabled,
+            cursorMode
         );
 
         mWindow->SetTitle(title);
@@ -474,6 +505,52 @@ namespace Engine
                << (available ? "true" : "false")
                << ", Enabled="
                << (enabled ? "true" : "false");
+
+        return stream.str();
+    }
+
+    void EngineLoop::ToggleCursorLock()
+    {
+        if (!mInputSystem)
+            return;
+
+        mInputSystem->ToggleCursorLock();
+
+        Core::Logger::Info("Input", BuildInputDebugLogLine());
+
+        UpdateWindowDebugTitle();
+    }
+
+    Core::String EngineLoop::BuildInputDebugLogLine() const
+    {
+        std::ostringstream stream;
+
+        if (!mInputSystem)
+        {
+            stream << "Input: not available";
+            return stream.str();
+        }
+
+        stream << "Input: "
+               << "CursorMode="
+               << GetCursorModeName(mInputSystem->GetCursorMode())
+               << ", RawMouseAvailable="
+               << (mInputSystem->IsRawMouseInputAvailable() ? "true" : "false")
+               << ", MousePosition=("
+               << mInputSystem->GetMouseX()
+               << ", "
+               << mInputSystem->GetMouseY()
+               << ")"
+               << ", MouseDelta=("
+               << mInputSystem->GetMouseDeltaX()
+               << ", "
+               << mInputSystem->GetMouseDeltaY()
+               << ")"
+               << ", RawMouseDelta=("
+               << mInputSystem->GetRawMouseDeltaX()
+               << ", "
+               << mInputSystem->GetRawMouseDeltaY()
+               << ")";
 
         return stream.str();
     }
