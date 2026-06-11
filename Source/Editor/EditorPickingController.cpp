@@ -295,6 +295,20 @@ namespace Editor
         if (!mContext.MainCamera || !mContext.InputSystem || !mContext.RenderSystem)
             return false;
 
+        if (mContext.InputSystem->IsCursorLocked())
+        {
+            Core::Vector3 direction =
+                mContext.MainCamera->GetForwardVector().Normalized();
+
+            if (direction.LengthSquared() <= 0.00001f)
+                return false;
+
+            outRay.Origin = mContext.MainCamera->GetPosition();
+            outRay.Direction = direction;
+
+            return outRay.IsValid();
+        }
+
         const Core::u32 viewportWidth =
             static_cast<Core::u32>(mContext.RenderSystem->GetWidth());
 
