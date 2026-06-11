@@ -3,6 +3,7 @@
 #include "EditorViewportController.h"
 #include "EditorToolModeController.h"
 #include "EditorSelectionController.h"
+#include "EditorPickingController.h"
 
 namespace Editor
 {
@@ -41,6 +42,45 @@ namespace Editor
             return false;
         }
 
+        mSelectionController = std::make_unique<EditorSelectionController>();
+
+        FEditorSelectionControllerDesc selectionDesc {};
+        selectionDesc.EnableDebugMarker = true;
+        selectionDesc.MarkerDistance = 4.25f;
+        selectionDesc.MarkerSize = 0.45f;
+
+        if (!mSelectionController->Initialize(mContext, selectionDesc))
+        {
+            mSelectionController.reset();
+
+            mViewportController->Shutdown();
+            mViewportController.reset();
+
+            mInitialized = false;
+            return false;
+        }
+
+        mPickingController = std::make_unique<EditorPickingController>();
+
+        FEditorPickingControllerDesc pickingDesc {};
+        pickingDesc.EnableDebugRay = true;
+        pickingDesc.LogPickRequests = true;
+        pickingDesc.DebugRayLength = 12.0f;
+
+        if (!mPickingController->Initialize(mContext, pickingDesc))
+        {
+            mPickingController.reset();
+
+            mSelectionController->Shutdown();
+            mSelectionController.reset();
+
+            mViewportController->Shutdown();
+            mViewportController.reset();
+
+            mInitialized = false;
+            return false;
+        }
+
         mToolModeController = std::make_unique<EditorToolModeController>();
 
         FEditorToolModeControllerDesc toolModeDesc {};
@@ -53,26 +93,11 @@ namespace Editor
         {
             mToolModeController.reset();
 
-            mViewportController->Shutdown();
-            mViewportController.reset();
+            mPickingController->Shutdown();
+            mPickingController.reset();
 
-            mInitialized = false;
-            return false;
-        }
-
-        mSelectionController = std::make_unique<EditorSelectionController>();
-
-        FEditorSelectionControllerDesc selectionDesc {};
-        selectionDesc.EnableDebugMarker = true;
-        selectionDesc.MarkerDistance = 4.25f;
-        selectionDesc.MarkerSize = 0.45f;
-
-        if (!mSelectionController->Initialize(mContext, selectionDesc))
-        {
+            mSelectionController->Shutdown();
             mSelectionController.reset();
-
-            mToolModeController->Shutdown();
-            mToolModeController.reset();
 
             mViewportController->Shutdown();
             mViewportController.reset();
@@ -87,16 +112,22 @@ namespace Editor
 
     void LevelEditorRuntime::Shutdown()
     {
-        if (mSelectionController)
-        {
-            mSelectionController->Shutdown();
-            mSelectionController.reset();
-        }
-
         if (mToolModeController)
         {
             mToolModeController->Shutdown();
             mToolModeController.reset();
+        }
+
+        if (mPickingController)
+        {
+            mPickingController->Shutdown();
+            mPickingController.reset();
+        }
+
+        if (mSelectionController)
+        {
+            mSelectionController->Shutdown();
+            mSelectionController.reset();
         }
 
         if (mViewportController)
@@ -119,6 +150,11 @@ namespace Editor
             mViewportController->Tick(deltaSeconds);
         }
 
+        if (mPickingController)
+        {
+            mPickingController->Tick(deltaSeconds);
+        }
+
         if (mSelectionController)
         {
             mSelectionController->Tick(deltaSeconds);
@@ -130,6 +166,7 @@ namespace Editor
         }
 
         // Позже тут будут:
+        // picking result routing
         // selection picking
         // gizmo tick
         // editor tools tick
@@ -143,6 +180,11 @@ namespace Editor
         if (mViewportController)
         {
             mViewportController->RenderDebug();
+        }
+
+        if (mPickingController)
+        {
+            mPickingController->RenderDebug();
         }
 
         if (mSelectionController)

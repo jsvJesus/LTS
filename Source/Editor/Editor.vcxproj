@@ -162,12 +162,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Editor.cpp" />
+    <ClCompile Include="EditorPickingController.cpp" />
     <ClCompile Include="EditorRuntime.cpp" />
     <ClCompile Include="EditorSelectionController.cpp" />
     <ClCompile Include="EditorToolModeController.cpp" />
     <ClCompile Include="EditorViewportController.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="EditorPickingController.h" />
+    <ClInclude Include="EditorPickingTypes.h" />
     <ClInclude Include="EditorRuntime.h" />
     <ClInclude Include="EditorSelectionController.h" />
     <ClInclude Include="EditorSelectionTypes.h" />
