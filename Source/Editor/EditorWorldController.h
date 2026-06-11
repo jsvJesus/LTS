@@ -73,6 +73,11 @@ namespace Editor
         [[nodiscard]] World::World* GetWorld() { return &mWorld; }
         [[nodiscard]] const World::World* GetWorld() const { return &mWorld; }
 
+        bool GetEntityTransform(
+            World::EntityId entityId,
+            World::FTransform& outTransform
+        ) const;
+
         [[nodiscard]] World::EntityId GetSelectedEntityId() const { return mSelectedEntityId; }
 
     private:

@@ -162,6 +162,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Editor.cpp" />
+    <ClCompile Include="EditorGizmoController.cpp" />
     <ClCompile Include="EditorPickingController.cpp" />
     <ClCompile Include="EditorRuntime.cpp" />
     <ClCompile Include="EditorSelectionController.cpp" />
@@ -170,6 +171,8 @@
     <ClCompile Include="EditorWorldController.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="EditorGizmoController.h" />
+    <ClInclude Include="EditorGizmoTypes.h" />
     <ClInclude Include="EditorPickingController.h" />
     <ClInclude Include="EditorPickingTypes.h" />
     <ClInclude Include="EditorRuntime.h" />

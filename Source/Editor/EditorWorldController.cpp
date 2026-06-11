@@ -225,6 +225,30 @@ namespace Editor
         mSelectedEntityId = World::InvalidEntityId;
     }
 
+    bool EditorWorldController::GetEntityTransform(
+        const World::EntityId entityId,
+        World::FTransform& outTransform
+    ) const
+    {
+        outTransform = World::FTransform {};
+
+        if (!mInitialized || !World::IsValidEntityId(entityId))
+            return false;
+
+        const World::Scene* scene = mWorld.GetActiveScene();
+
+        if (!scene)
+            return false;
+
+        const World::FEntity* entity = scene->FindEntity(entityId);
+
+        if (!entity || !entity->IsValid())
+            return false;
+
+        outTransform = entity->Transform;
+        return true;
+    }
+
     bool EditorWorldController::CreateDefaultEditorScene()
     {
         World::Scene* scene = mWorld.CreateEmptyScene("EditorPreviewScene");

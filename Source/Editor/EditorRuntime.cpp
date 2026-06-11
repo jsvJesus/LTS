@@ -5,6 +5,7 @@
 #include "EditorToolModeController.h"
 #include "EditorSelectionController.h"
 #include "EditorPickingController.h"
+#include "EditorGizmoController.h"
 
 #include "World/EntityId.h"
 
@@ -140,12 +141,49 @@ namespace Editor
             return false;
         }
 
+        mGizmoController = std::make_unique<EditorGizmoController>();
+
+        FEditorGizmoControllerDesc gizmoDesc {};
+        gizmoDesc.EnableDebugDraw = true;
+        gizmoDesc.MoveAxisLength = 1.35f;
+        gizmoDesc.RotateRadius = 0.85f;
+        gizmoDesc.ScaleBoxHalfExtent = 0.42f;
+
+        if (!mGizmoController->Initialize(mContext, gizmoDesc))
+        {
+            mGizmoController.reset();
+
+            mToolModeController->Shutdown();
+            mToolModeController.reset();
+
+            mPickingController->Shutdown();
+            mPickingController.reset();
+
+            mSelectionController->Shutdown();
+            mSelectionController.reset();
+
+            mWorldController->Shutdown();
+            mWorldController.reset();
+
+            mViewportController->Shutdown();
+            mViewportController.reset();
+
+            mInitialized = false;
+            return false;
+        }
+
         mInitialized = true;
         return true;
     }
 
     void LevelEditorRuntime::Shutdown()
     {
+        if (mGizmoController)
+        {
+            mGizmoController->Shutdown();
+            mGizmoController.reset();
+        }
+        
         if (mToolModeController)
         {
             mToolModeController->Shutdown();
@@ -216,6 +254,13 @@ namespace Editor
             mToolModeController->Tick(deltaSeconds);
         }
 
+        SyncGizmoState();
+
+        if (mGizmoController)
+        {
+            mGizmoController->Tick(deltaSeconds);
+        }
+
         // Позже тут будут:
         // gizmo tick
         // editor tools tick
@@ -250,6 +295,11 @@ namespace Editor
         if (mToolModeController)
         {
             mToolModeController->RenderDebug();
+        }
+
+        if (mGizmoController)
+        {
+            mGizmoController->RenderDebug();
         }
     }
 
@@ -299,5 +349,32 @@ namespace Editor
         mWorldController->SetSelectedEntityId(
             static_cast<World::EntityId>(mSelectionController->GetSelectedId())
         );
+    }
+
+    void LevelEditorRuntime::SyncGizmoState()
+    {
+        if (!mGizmoController || !mToolModeController || !mSelectionController || !mWorldController)
+            return;
+
+        mGizmoController->SetToolMode(mToolModeController->GetToolMode());
+
+        if (!mSelectionController->HasSelection())
+        {
+            mGizmoController->ClearTarget();
+            return;
+        }
+
+        const World::EntityId selectedEntityId =
+            static_cast<World::EntityId>(mSelectionController->GetSelectedId());
+
+        World::FTransform selectedTransform {};
+
+        if (!mWorldController->GetEntityTransform(selectedEntityId, selectedTransform))
+        {
+            mGizmoController->ClearTarget();
+            return;
+        }
+
+        mGizmoController->SetTarget(selectedEntityId, selectedTransform);
     }
 }

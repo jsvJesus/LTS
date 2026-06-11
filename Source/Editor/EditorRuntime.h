@@ -9,6 +9,7 @@
 #include "EditorToolModeController.h"
 #include "EditorSelectionController.h"
 #include "EditorPickingController.h"
+#include "EditorGizmoController.h"
 
 namespace Editor
 {
@@ -34,6 +35,7 @@ namespace Editor
     private:
         void RoutePickingToSelection();
         void SyncWorldSelectionDebug();
+        void SyncGizmoState();
 
     private:
         Engine::FApplicationRuntimeContext mContext {};
@@ -43,6 +45,7 @@ namespace Editor
         std::unique_ptr<EditorToolModeController> mToolModeController;
         std::unique_ptr<EditorSelectionController> mSelectionController;
         std::unique_ptr<EditorPickingController> mPickingController;
+        std::unique_ptr<EditorGizmoController> mGizmoController;
 
         Core::u64 mLastSelectionPickRequestId = 0;
 
