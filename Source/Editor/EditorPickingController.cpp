@@ -10,6 +10,7 @@
 #include "Core/Logger.h"
 
 #include <sstream>
+#include <algorithm>
 #include <cmath>
 
 namespace Editor
@@ -58,6 +59,91 @@ namespace Editor
 
             const Core::f32 height = static_cast<Core::f32>(viewportHeight);
             return 1.0f - (static_cast<Core::f32>(mouseY) / height) * 2.0f;
+        }
+
+        bool TryInvertMatrix4(
+            const Core::Matrix4& matrix,
+            Core::Matrix4& outInverse
+        )
+        {
+            Core::f32 augmented[4][8] {};
+
+            for (Core::usize row = 0; row < 4; ++row)
+            {
+                for (Core::usize column = 0; column < 4; ++column)
+                {
+                    augmented[row][column] = matrix.M[row][column];
+                }
+
+                augmented[row][row + 4] = 1.0f;
+            }
+
+            for (Core::usize pivot = 0; pivot < 4; ++pivot)
+            {
+                Core::usize bestRow = pivot;
+                Core::f32 bestValue = static_cast<Core::f32>(
+                    std::fabs(augmented[pivot][pivot])
+                );
+
+                for (Core::usize row = pivot + 1; row < 4; ++row)
+                {
+                    const Core::f32 value = static_cast<Core::f32>(
+                        std::fabs(augmented[row][pivot])
+                    );
+
+                    if (value > bestValue)
+                    {
+                        bestValue = value;
+                        bestRow = row;
+                    }
+                }
+
+                if (bestValue <= 0.00001f)
+                    return false;
+
+                if (bestRow != pivot)
+                {
+                    for (Core::usize column = 0; column < 8; ++column)
+                    {
+                        std::swap(augmented[pivot][column], augmented[bestRow][column]);
+                    }
+                }
+
+                const Core::f32 pivotValue = augmented[pivot][pivot];
+
+                for (Core::usize column = 0; column < 8; ++column)
+                {
+                    augmented[pivot][column] /= pivotValue;
+                }
+
+                for (Core::usize row = 0; row < 4; ++row)
+                {
+                    if (row == pivot)
+                        continue;
+
+                    const Core::f32 factor = augmented[row][pivot];
+
+                    if (std::fabs(factor) <= 0.00001f)
+                        continue;
+
+                    for (Core::usize column = 0; column < 8; ++column)
+                    {
+                        augmented[row][column] -= factor * augmented[pivot][column];
+                    }
+                }
+            }
+
+            outInverse = Core::Matrix4::Identity();
+
+            for (Core::usize row = 0; row < 4; ++row)
+            {
+                for (Core::usize column = 0; column < 4; ++column)
+                {
+                    outInverse.M[row][column] = augmented[row][column + 4];
+                }
+            }
+
+            return true;
         }
     }
 
@@ -228,27 +314,31 @@ namespace Editor
             viewportHeight
         );
 
-        const Core::f32 fieldOfViewRadians =
-            Core::ToRadians(mContext.MainCamera->GetFieldOfViewYDegrees());
+        const Core::Matrix4 viewProjection =
+            mContext.MainCamera->GetViewMatrix() *
+            mContext.MainCamera->GetProjectionMatrix();
 
-        const Core::f32 tanHalfFov =
-            static_cast<Core::f32>(std::tan(fieldOfViewRadians * 0.5f));
+        Core::Matrix4 inverseViewProjection {};
 
-        const Core::f32 aspectRatio = mContext.MainCamera->GetAspectRatio();
+        if (!TryInvertMatrix4(viewProjection, inverseViewProjection))
+            return false;
 
-        const Core::Vector3 forward = mContext.MainCamera->GetForwardVector().Normalized();
-        const Core::Vector3 right = mContext.MainCamera->GetRightVector().Normalized();
-        const Core::Vector3 up = mContext.MainCamera->GetUpVector().Normalized();
+        const Core::Vector3 nearPoint = Core::Matrix4::TransformPoint(
+            Core::Vector3(normalizedX, normalizedY, 0.0f),
+            inverseViewProjection
+        );
 
-        Core::Vector3 direction =
-            forward +
-            right * (normalizedX * aspectRatio * tanHalfFov) +
-            up * (normalizedY * tanHalfFov);
+        const Core::Vector3 farPoint = Core::Matrix4::TransformPoint(
+            Core::Vector3(normalizedX, normalizedY, 1.0f),
+            inverseViewProjection
+        );
 
-        direction.Normalize();
+        Core::Vector3 direction = farPoint - nearPoint;
 
         if (direction.LengthSquared() <= 0.00001f)
             return false;
+
+        direction.Normalize();
 
         outRay.Origin = mContext.MainCamera->GetPosition();
         outRay.Direction = direction;
