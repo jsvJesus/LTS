@@ -166,10 +166,12 @@
   <ItemGroup>
     <ClCompile Include="Core.cpp" />
     <ClCompile Include="Logger.cpp" />
+    <ClCompile Include="Math\Math.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BaseTypes.h" />
     <ClInclude Include="Logger.h" />
+    <ClInclude Include="Math\Math.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
