@@ -1,11 +1,14 @@
 #include "EditorGizmoController.h"
 
+#include "Platform/Input.h"
+
 #include "Render/RenderSystem.h"
 #include "Render/RHI/RenderTypes.h"
 
 #include "Core/Logger.h"
 
 #include <cmath>
+#include <limits>
 
 namespace Editor
 {
@@ -30,6 +33,152 @@ namespace Editor
         {
             return value > 0.001f ? value : fallback;
         }
+
+        Core::f32 Clamp01(const Core::f32 value)
+        {
+            if (value < 0.0f)
+                return 0.0f;
+
+            if (value > 1.0f)
+                return 1.0f;
+
+            return value;
+        }
+
+        Core::f32 DistanceSquared(
+            const Core::Vector3& a,
+            const Core::Vector3& b
+        )
+        {
+            return (a - b).LengthSquared();
+        }
+
+        bool ComputeRaySegmentClosestPoints(
+            const Core::Vector3& rayOrigin,
+            const Core::Vector3& rayDirection,
+            const Core::Vector3& segmentStart,
+            const Core::Vector3& segmentEnd,
+            Core::f32& outRayDistance,
+            Core::Vector3& outRayPoint,
+            Core::Vector3& outSegmentPoint
+        )
+        {
+            const Core::Vector3 direction = rayDirection.Normalized();
+
+            if (direction.LengthSquared() <= 0.00001f)
+                return false;
+
+            const Core::Vector3 segment = segmentEnd - segmentStart;
+            const Core::f32 segmentLengthSquared = segment.LengthSquared();
+
+            if (segmentLengthSquared <= 0.00001f)
+                return false;
+
+            const Core::Vector3 w0 = rayOrigin - segmentStart;
+
+            const Core::f32 a = Core::Vector3::Dot(direction, direction);
+            const Core::f32 b = Core::Vector3::Dot(direction, segment);
+            const Core::f32 c = Core::Vector3::Dot(segment, segment);
+            const Core::f32 d = Core::Vector3::Dot(direction, w0);
+            const Core::f32 e = Core::Vector3::Dot(segment, w0);
+
+            const Core::f32 denominator = a * c - b * b;
+
+            Core::f32 rayDistance = 0.0f;
+            Core::f32 segmentFactor = 0.0f;
+
+            if (std::fabs(denominator) > 0.00001f)
+            {
+                rayDistance = (b * e - c * d) / denominator;
+                segmentFactor = (a * e - b * d) / denominator;
+            }
+            else
+            {
+                rayDistance = 0.0f;
+                segmentFactor = e / c;
+            }
+
+            segmentFactor = Clamp01(segmentFactor);
+
+            Core::Vector3 segmentPoint = segmentStart + segment * segmentFactor;
+
+            rayDistance = Core::Vector3::Dot(segmentPoint - rayOrigin, direction);
+
+            if (rayDistance < 0.0f)
+            {
+                rayDistance = 0.0f;
+            }
+
+            Core::Vector3 rayPoint = rayOrigin + direction * rayDistance;
+
+            segmentFactor =
+                Core::Vector3::Dot(rayPoint - segmentStart, segment) / segmentLengthSquared;
+
+            segmentFactor = Clamp01(segmentFactor);
+
+            segmentPoint = segmentStart + segment * segmentFactor;
+
+            rayDistance = Core::Vector3::Dot(segmentPoint - rayOrigin, direction);
+
+            if (rayDistance < 0.0f)
+            {
+                rayDistance = 0.0f;
+            }
+
+            rayPoint = rayOrigin + direction * rayDistance;
+
+            outRayDistance = rayDistance;
+            outRayPoint = rayPoint;
+            outSegmentPoint = segmentPoint;
+
+            return true;
+        }
+
+        bool IntersectRaySphere(
+            const Core::Vector3& rayOrigin,
+            const Core::Vector3& rayDirection,
+            const Core::Vector3& sphereCenter,
+            const Core::f32 sphereRadius,
+            Core::f32& outDistance
+        )
+        {
+            const Core::Vector3 direction = rayDirection.Normalized();
+
+            if (direction.LengthSquared() <= 0.00001f)
+                return false;
+
+            const Core::Vector3 oc = rayOrigin - sphereCenter;
+
+            const Core::f32 a = Core::Vector3::Dot(direction, direction);
+            const Core::f32 b = 2.0f * Core::Vector3::Dot(oc, direction);
+            const Core::f32 c =
+                Core::Vector3::Dot(oc, oc) - sphereRadius * sphereRadius;
+
+            const Core::f32 discriminant = b * b - 4.0f * a * c;
+
+            if (discriminant < 0.0f)
+                return false;
+
+            const Core::f32 sqrtDiscriminant = Core::SafeSqrt(discriminant);
+            const Core::f32 invDenominator = 1.0f / (2.0f * a);
+
+            const Core::f32 t0 = (-b - sqrtDiscriminant) * invDenominator;
+            const Core::f32 t1 = (-b + sqrtDiscriminant) * invDenominator;
+
+            if (t0 >= 0.0f)
+            {
+                outDistance = t0;
+                return true;
+            }
+
+            if (t1 >= 0.0f)
+            {
+                outDistance = t1;
+                return true;
+            }
+
+            return false;
+        }
     }
 
     bool EditorGizmoController::Initialize(
@@ -52,6 +201,7 @@ namespace Editor
         mMoveAxisLength = SanitizePositiveValue(desc.MoveAxisLength, 1.35f);
         mRotateRadius = SanitizePositiveValue(desc.RotateRadius, 0.85f);
         mScaleBoxHalfExtent = SanitizePositiveValue(desc.ScaleBoxHalfExtent, 0.42f);
+        mAxisHitRadius = SanitizePositiveValue(desc.AxisHitRadius, 0.18f);
 
         mInitialized = true;
 
@@ -76,6 +226,7 @@ namespace Editor
         mMoveAxisLength = 1.35f;
         mRotateRadius = 0.85f;
         mScaleBoxHalfExtent = 0.42f;
+        mAxisHitRadius = 0.18f;
     }
 
     void EditorGizmoController::Tick(const double deltaSeconds)
@@ -84,6 +235,15 @@ namespace Editor
 
         if (!mInitialized)
             return;
+
+        if (mState.IsDragging() && mContext.InputSystem)
+        {
+            if (mContext.InputSystem->IsMouseButtonReleased(Platform::MouseButton::Left) ||
+                !mContext.InputSystem->IsMouseButtonDown(Platform::MouseButton::Left))
+            {
+                EndDrag();
+            }
+        }
     }
 
     void EditorGizmoController::RenderDebug()
@@ -135,12 +295,48 @@ namespace Editor
         mState.LastRay = FEditorPickRay {};
     }
 
+    bool EditorGizmoController::TryHitAxis(
+        const FEditorPickRay& ray,
+        FEditorGizmoAxisHitResult& outResult
+    ) const
+    {
+        outResult = FEditorGizmoAxisHitResult {};
+        outResult.Distance = std::numeric_limits<Core::f32>::max();
+
+        if (!mInitialized || !ray.IsValid() || !mState.CanDrawGizmo())
+            return false;
+
+        bool hit = false;
+
+        switch (mState.ToolMode)
+        {
+        case EEditorToolMode::Move:
+            hit = TryHitMoveGizmoAxis(ray, outResult);
+            break;
+
+        case EEditorToolMode::Rotate:
+            hit = TryHitRotateGizmoAxis(ray, outResult);
+            break;
+
+        case EEditorToolMode::Scale:
+            hit = TryHitScaleGizmoAxis(ray, outResult);
+            break;
+
+        case EEditorToolMode::Select:
+        default:
+            hit = false;
+            break;
+        }
+
+        return hit && outResult.IsValid();
+    }
+
     void EditorGizmoController::BeginDrag(
         const FEditorPickRay& ray,
         const EEditorGizmoAxis axis
     )
     {
-        if (!mState.CanDrawGizmo() || !ray.IsValid())
+        if (!mState.CanDrawGizmo() || !ray.IsValid() || axis == EEditorGizmoAxis::None)
             return;
 
         mState.ActiveAxis = axis;
@@ -166,6 +362,258 @@ namespace Editor
         mState.DragState = EEditorGizmoDragState::Idle;
         mState.DragStartRay = FEditorPickRay {};
         mState.LastRay = FEditorPickRay {};
+    }
+
+    bool EditorGizmoController::TryHitMoveGizmoAxis(
+        const FEditorPickRay& ray,
+        FEditorGizmoAxisHitResult& outResult
+    ) const
+    {
+        const Core::Vector3 position = mState.TargetTransform.Position;
+        const Core::f32 length = GetSafeMoveAxisLength();
+
+        bool hit = false;
+
+        hit |= TryHitAxisSegment(
+            ray,
+            position,
+            position + Core::Vector3::Right() * length,
+            EEditorGizmoAxis::X,
+            outResult
+        );
+
+        hit |= TryHitAxisSegment(
+            ray,
+            position,
+            position + Core::Vector3::Up() * length,
+            EEditorGizmoAxis::Y,
+            outResult
+        );
+
+        hit |= TryHitAxisSegment(
+            ray,
+            position,
+            position + Core::Vector3::Forward() * length,
+            EEditorGizmoAxis::Z,
+            outResult
+        );
+
+        return hit;
+    }
+
+    bool EditorGizmoController::TryHitRotateGizmoAxis(
+        const FEditorPickRay& ray,
+        FEditorGizmoAxisHitResult& outResult
+    ) const
+    {
+        const Core::Vector3 position = mState.TargetTransform.Position;
+        const Core::f32 radius = GetSafeRotateRadius();
+
+        bool hit = false;
+
+        hit |= TryHitCircleSegments(
+            ray,
+            position,
+            Core::Vector3::Up(),
+            Core::Vector3::Forward(),
+            radius,
+            EEditorGizmoAxis::X,
+            outResult
+        );
+
+        hit |= TryHitCircleSegments(
+            ray,
+            position,
+            Core::Vector3::Right(),
+            Core::Vector3::Forward(),
+            radius,
+            EEditorGizmoAxis::Y,
+            outResult
+        );
+
+        hit |= TryHitCircleSegments(
+            ray,
+            position,
+            Core::Vector3::Right(),
+            Core::Vector3::Up(),
+            radius,
+            EEditorGizmoAxis::Z,
+            outResult
+        );
+
+        return hit;
+    }
+
+    bool EditorGizmoController::TryHitScaleGizmoAxis(
+        const FEditorPickRay& ray,
+        FEditorGizmoAxisHitResult& outResult
+    ) const
+    {
+        const Core::Vector3 position = mState.TargetTransform.Position;
+
+        bool hit = false;
+
+        Core::f32 uniformDistance = 0.0f;
+
+        if (IntersectRaySphere(
+            ray.Origin,
+            ray.Direction,
+            position,
+            GetSafeScaleBoxHalfExtent() * 1.35f,
+            uniformDistance
+        ))
+        {
+            const Core::Vector3 hitPosition =
+                ray.Origin + ray.Direction.Normalized() * uniformDistance;
+
+            hit |= TryAcceptAxisHit(
+                EEditorGizmoAxis::Uniform,
+                uniformDistance,
+                hitPosition,
+                outResult
+            );
+        }
+
+        const Core::f32 length = GetSafeMoveAxisLength() * 0.85f;
+
+        hit |= TryHitAxisSegment(
+            ray,
+            position,
+            position + Core::Vector3::Right() * length,
+            EEditorGizmoAxis::X,
+            outResult
+        );
+
+        hit |= TryHitAxisSegment(
+            ray,
+            position,
+            position + Core::Vector3::Up() * length,
+            EEditorGizmoAxis::Y,
+            outResult
+        );
+
+        hit |= TryHitAxisSegment(
+            ray,
+            position,
+            position + Core::Vector3::Forward() * length,
+            EEditorGizmoAxis::Z,
+            outResult
+        );
+
+        return hit;
+    }
+
+    bool EditorGizmoController::TryHitAxisSegment(
+        const FEditorPickRay& ray,
+        const Core::Vector3& start,
+        const Core::Vector3& end,
+        const EEditorGizmoAxis axis,
+        FEditorGizmoAxisHitResult& outResult
+    ) const
+    {
+        Core::f32 rayDistance = 0.0f;
+        Core::Vector3 rayPoint = Core::Vector3::Zero();
+        Core::Vector3 segmentPoint = Core::Vector3::Zero();
+
+        if (!ComputeRaySegmentClosestPoints(
+            ray.Origin,
+            ray.Direction,
+            start,
+            end,
+            rayDistance,
+            rayPoint,
+            segmentPoint
+        ))
+        {
+            return false;
+        }
+
+        const Core::f32 hitRadius = GetSafeAxisHitRadius();
+        const Core::f32 distanceSquared = DistanceSquared(rayPoint, segmentPoint);
+
+        if (distanceSquared > hitRadius * hitRadius)
+            return false;
+
+        return TryAcceptAxisHit(axis, rayDistance, segmentPoint, outResult);
+    }
+
+    bool EditorGizmoController::TryHitCircleSegments(
+        const FEditorPickRay& ray,
+        const Core::Vector3& center,
+        const Core::Vector3& axisA,
+        const Core::Vector3& axisB,
+        const Core::f32 radius,
+        const EEditorGizmoAxis axis,
+        FEditorGizmoAxisHitResult& outResult
+    ) const
+    {
+        const Core::Vector3 normalizedAxisA = axisA.Normalized();
+        const Core::Vector3 normalizedAxisB = axisB.Normalized();
+
+        if (normalizedAxisA.LengthSquared() <= 0.00001f ||
+            normalizedAxisB.LengthSquared() <= 0.00001f)
+        {
+            return false;
+        }
+
+        constexpr Core::i32 SegmentCount = 48;
+
+        bool hit = false;
+
+        Core::Vector3 previousPoint =
+            center + normalizedAxisA * radius;
+
+        for (Core::i32 segmentIndex = 1; segmentIndex <= SegmentCount; ++segmentIndex)
+        {
+            const Core::f32 t =
+                static_cast<Core::f32>(segmentIndex) / static_cast<Core::f32>(SegmentCount);
+
+            const Core::f32 angle = Core::TwoPi * t;
+
+            const Core::f32 cosine = static_cast<Core::f32>(std::cos(angle));
+            const Core::f32 sine = static_cast<Core::f32>(std::sin(angle));
+
+            const Core::Vector3 currentPoint =
+                center +
+                normalizedAxisA * (cosine * radius) +
+                normalizedAxisB * (sine * radius);
+
+            hit |= TryHitAxisSegment(
+                ray,
+                previousPoint,
+                currentPoint,
+                axis,
+                outResult
+            );
+
+            previousPoint = currentPoint;
+        }
+
+        return hit;
+    }
+
+    bool EditorGizmoController::TryAcceptAxisHit(
+        const EEditorGizmoAxis axis,
+        const Core::f32 distance,
+        const Core::Vector3& hitPosition,
+        FEditorGizmoAxisHitResult& outResult
+    ) const
+    {
+        if (axis == EEditorGizmoAxis::None)
+            return false;
+
+        if (distance < 0.0f)
+            return false;
+
+        if (outResult.IsValid() && distance >= outResult.Distance)
+            return false;
+
+        outResult.Hit = true;
+        outResult.Axis = axis;
+        outResult.Distance = distance;
+        outResult.HitPosition = hitPosition;
+
+        return true;
     }
 
     void EditorGizmoController::DrawGizmo()
@@ -447,5 +895,10 @@ namespace Editor
     Core::f32 EditorGizmoController::GetSafeScaleBoxHalfExtent() const
     {
         return SanitizePositiveValue(mScaleBoxHalfExtent, 0.42f);
+    }
+
+    Core::f32 EditorGizmoController::GetSafeAxisHitRadius() const
+    {
+        return SanitizePositiveValue(mAxisHitRadius, 0.18f);
     }
 }

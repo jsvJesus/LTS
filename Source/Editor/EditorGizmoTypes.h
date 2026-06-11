@@ -24,6 +24,21 @@ namespace Editor
         Dragging
     };
 
+    struct FEditorGizmoAxisHitResult final
+    {
+        bool Hit = false;
+
+        EEditorGizmoAxis Axis = EEditorGizmoAxis::None;
+
+        Core::f32 Distance = 0.0f;
+        Core::Vector3 HitPosition = Core::Vector3::Zero();
+
+        [[nodiscard]] bool IsValid() const
+        {
+            return Hit && Axis != EEditorGizmoAxis::None;
+        }
+    };
+
     struct FEditorGizmoState final
     {
         EEditorToolMode ToolMode = EEditorToolMode::Select;

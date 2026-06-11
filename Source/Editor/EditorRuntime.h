@@ -33,7 +33,9 @@ namespace Editor
         [[nodiscard]] bool IsInitialized() const { return mInitialized; }
 
     private:
+        bool RoutePickingToGizmo();
         void RoutePickingToSelection();
+
         void SyncWorldSelectionDebug();
         void SyncGizmoState();
 
@@ -48,6 +50,7 @@ namespace Editor
         std::unique_ptr<EditorGizmoController> mGizmoController;
 
         Core::u64 mLastSelectionPickRequestId = 0;
+        Core::u64 mLastGizmoPickRequestId = 0;
 
         bool mInitialized = false;
     };

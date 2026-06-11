@@ -18,6 +18,8 @@ namespace Editor
         Core::f32 MoveAxisLength = 1.35f;
         Core::f32 RotateRadius = 0.85f;
         Core::f32 ScaleBoxHalfExtent = 0.42f;
+
+        Core::f32 AxisHitRadius = 0.18f;
     };
 
     class EditorGizmoController final
@@ -48,6 +50,11 @@ namespace Editor
 
         void ClearTarget();
 
+        bool TryHitAxis(
+            const FEditorPickRay& ray,
+            FEditorGizmoAxisHitResult& outResult
+        ) const;
+
         void BeginDrag(const FEditorPickRay& ray, EEditorGizmoAxis axis);
         void UpdateDrag(const FEditorPickRay& ray);
         void EndDrag();
@@ -56,6 +63,46 @@ namespace Editor
         [[nodiscard]] const FEditorGizmoState& GetState() const { return mState; }
 
     private:
+        bool TryHitMoveGizmoAxis(
+            const FEditorPickRay& ray,
+            FEditorGizmoAxisHitResult& outResult
+        ) const;
+
+        bool TryHitRotateGizmoAxis(
+            const FEditorPickRay& ray,
+            FEditorGizmoAxisHitResult& outResult
+        ) const;
+
+        bool TryHitScaleGizmoAxis(
+            const FEditorPickRay& ray,
+            FEditorGizmoAxisHitResult& outResult
+        ) const;
+
+        bool TryHitAxisSegment(
+            const FEditorPickRay& ray,
+            const Core::Vector3& start,
+            const Core::Vector3& end,
+            EEditorGizmoAxis axis,
+            FEditorGizmoAxisHitResult& outResult
+        ) const;
+
+        bool TryHitCircleSegments(
+            const FEditorPickRay& ray,
+            const Core::Vector3& center,
+            const Core::Vector3& axisA,
+            const Core::Vector3& axisB,
+            Core::f32 radius,
+            EEditorGizmoAxis axis,
+            FEditorGizmoAxisHitResult& outResult
+        ) const;
+
+        bool TryAcceptAxisHit(
+            EEditorGizmoAxis axis,
+            Core::f32 distance,
+            const Core::Vector3& hitPosition,
+            FEditorGizmoAxisHitResult& outResult
+        ) const;
+
         void DrawGizmo();
 
         void DrawMoveGizmo(const Core::Vector3& position);
@@ -88,6 +135,7 @@ namespace Editor
         [[nodiscard]] Core::f32 GetSafeMoveAxisLength() const;
         [[nodiscard]] Core::f32 GetSafeRotateRadius() const;
         [[nodiscard]] Core::f32 GetSafeScaleBoxHalfExtent() const;
+        [[nodiscard]] Core::f32 GetSafeAxisHitRadius() const;
 
     private:
         Engine::FApplicationRuntimeContext mContext {};
@@ -100,5 +148,6 @@ namespace Editor
         Core::f32 mMoveAxisLength = 1.35f;
         Core::f32 mRotateRadius = 0.85f;
         Core::f32 mScaleBoxHalfExtent = 0.42f;
+        Core::f32 mAxisHitRadius = 0.18f;
     };
 }

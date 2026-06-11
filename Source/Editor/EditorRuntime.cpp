@@ -148,6 +148,7 @@ namespace Editor
         gizmoDesc.MoveAxisLength = 1.35f;
         gizmoDesc.RotateRadius = 0.85f;
         gizmoDesc.ScaleBoxHalfExtent = 0.42f;
+        gizmoDesc.AxisHitRadius = 0.18f;
 
         if (!mGizmoController->Initialize(mContext, gizmoDesc))
         {
@@ -217,6 +218,7 @@ namespace Editor
         mContext = Engine::FApplicationRuntimeContext {};
 
         mLastSelectionPickRequestId = 0;
+        mLastGizmoPickRequestId = 0;
         mInitialized = false;
     }
 
@@ -240,7 +242,12 @@ namespace Editor
             mPickingController->Tick(deltaSeconds);
         }
 
-        RoutePickingToSelection();
+        const bool gizmoCapturedPick = RoutePickingToGizmo();
+
+        if (!gizmoCapturedPick)
+        {
+            RoutePickingToSelection();
+        }
 
         if (mSelectionController)
         {
@@ -303,6 +310,35 @@ namespace Editor
         }
     }
 
+    bool LevelEditorRuntime::RoutePickingToGizmo()
+    {
+        if (!mGizmoController || !mPickingController)
+            return false;
+
+        if (!mPickingController->HasLastPickRequest())
+            return false;
+
+        const FEditorPickRequest& pickRequest =
+            mPickingController->GetLastPickRequest();
+
+        if (pickRequest.RequestId == mLastGizmoPickRequestId)
+            return true;
+
+        if (pickRequest.RequestId == mLastSelectionPickRequestId)
+            return false;
+
+        FEditorGizmoAxisHitResult hitResult {};
+
+        if (!mGizmoController->TryHitAxis(pickRequest.Ray, hitResult))
+            return false;
+
+        mLastGizmoPickRequestId = pickRequest.RequestId;
+
+        mGizmoController->BeginDrag(pickRequest.Ray, hitResult.Axis);
+
+        return true;
+    }
+
     void LevelEditorRuntime::RoutePickingToSelection()
     {
         if (!mWorldController || !mPickingController || !mSelectionController)
@@ -315,6 +351,9 @@ namespace Editor
             mPickingController->GetLastPickRequest();
 
         if (pickRequest.RequestId == mLastSelectionPickRequestId)
+            return;
+
+        if (pickRequest.RequestId == mLastGizmoPickRequestId)
             return;
 
         mLastSelectionPickRequestId = pickRequest.RequestId;
