@@ -2,9 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:vm="using:EditorUI.ViewModels"
         mc:Ignorable="d"
-        x:DataType="vm:MainWindowViewModel"
+        x:CompileBindings="False"
         d:DesignWidth="1180"
         d:DesignHeight="720"
         Width="1180"
@@ -46,7 +45,6 @@
               Margin="22"
               ColumnDefinitions="390,18,*,18,340">
 
-            <!-- Create / Import map -->
             <Border Grid.Column="0"
                     Padding="18"
                     Background="#1B1E25"
@@ -129,7 +127,6 @@
                 </ScrollViewer>
             </Border>
 
-            <!-- Open map -->
             <Border Grid.Column="2"
                     Padding="18"
                     Background="#1B1E25"
@@ -151,7 +148,7 @@
                              ItemsSource="{Binding Maps}"
                              SelectedItem="{Binding SelectedMap, Mode=TwoWay}">
                         <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="vm:EditorMapItemViewModel">
+                            <DataTemplate>
                                 <Border Padding="12"
                                         Margin="0,0,0,8"
                                         Background="#232832"
@@ -177,7 +174,6 @@
                 </Grid>
             </Border>
 
-            <!-- Actions / status -->
             <Border Grid.Column="4"
                     Padding="18"
                     Background="#1B1E25"
