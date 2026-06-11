@@ -1,12 +1,17 @@
 #include "Engine/Engine.h"
 
+#include "Editor/EditorRuntime.h"
+
 int main(int argc, char* argv[])
 {
     (void)argc;
     (void)argv;
 
+    Editor::LevelEditorRuntime editorRuntime;
+
     Engine::FApplicationDesc appDesc {};
     appDesc.ApplicationMode = Engine::EApplicationMode::LevelEditor;
+    appDesc.Runtime = &editorRuntime;
 
     appDesc.ApplicationName = "LevelEditor";
     appDesc.LogDirectory = "Logs/LevelEditor";

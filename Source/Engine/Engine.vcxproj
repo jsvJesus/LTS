@@ -169,6 +169,7 @@
     <ClCompile Include="FrameTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ApplicationRuntime.h" />
     <ClInclude Include="Camera\Camera.h" />
     <ClInclude Include="Camera\CameraController.h" />
     <ClInclude Include="Engine.h" />

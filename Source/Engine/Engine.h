@@ -4,6 +4,8 @@
 
 namespace Engine
 {
+    class IApplicationRuntime;
+
     enum class EApplicationMode : std::uint8_t
     {
         Unknown = 0,
@@ -25,6 +27,8 @@ namespace Engine
     struct FApplicationDesc
     {
         EApplicationMode ApplicationMode = EApplicationMode::Unknown;
+
+        IApplicationRuntime* Runtime = nullptr;
 
         const char* ApplicationName = "Application";
         const char* LogDirectory = "Logs/Application";

@@ -1,5 +1,6 @@
 #include "Engine.h"
 
+#include "ApplicationRuntime.h"
 #include "EngineLoop.h"
 
 #include "Core/Logger.h"
@@ -74,6 +75,15 @@ namespace Engine
         Core::Logger::Info("Engine", "Starting window application.");
         Core::Logger::Info("Engine", GetApplicationModeName(desc.ApplicationMode));
 
+        if (desc.Runtime)
+        {
+            Core::Logger::Info("Engine", desc.Runtime->GetRuntimeName());
+        }
+        else
+        {
+            Core::Logger::Info("Engine", "Application runtime: none.");
+        }
+
         EngineLoop loop;
 
         if (!loop.Initialize(desc))
@@ -107,6 +117,7 @@ namespace Engine
     {
         FApplicationDesc desc {};
         desc.ApplicationMode = EApplicationMode::Unknown;
+        desc.Runtime = nullptr;
         desc.ApplicationName = "Application";
         desc.LogDirectory = "Logs/Application";
         desc.Title = title;

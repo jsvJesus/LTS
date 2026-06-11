@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "ApplicationRuntime.h"
 #include "Engine.h"
 #include "FrameLimiter.h"
 #include "FrameStats.h"
@@ -49,6 +50,13 @@ namespace Engine
 
         [[nodiscard]] bool IsEditorRuntimeMode() const;
 
+        [[nodiscard]] FApplicationRuntimeContext BuildApplicationRuntimeContext() const;
+        bool InitializeApplicationRuntime();
+        void ShutdownApplicationRuntime();
+        void TickApplicationRuntime(double deltaSeconds);
+        void RenderApplicationRuntimeDebug();
+        Core::String BuildApplicationRuntimeLogLine() const;
+
         void LogFrameLimiterState() const;
         Core::String BuildFrameLimiterLogLine() const;
 
@@ -74,6 +82,9 @@ namespace Engine
         bool mRunning = false;
 
         EApplicationMode mApplicationMode = EApplicationMode::Unknown;
+
+        IApplicationRuntime* mApplicationRuntime = nullptr;
+        bool mApplicationRuntimeInitialized = false;
 
         bool mEnableFrameStatsTitle = true;
         double mFrameStatsTitleUpdateIntervalSeconds = 0.5;

@@ -188,6 +188,8 @@ namespace Engine
     {
         Shutdown();
         mApplicationMode = desc.ApplicationMode;
+        mApplicationRuntime = desc.Runtime;
+        mApplicationRuntimeInitialized = false;
 
         mBaseWindowTitle = WideToUtf8(desc.Title);
         mEnableFrameStatsTitle = desc.EnableFrameStatsTitle;
@@ -247,6 +249,12 @@ namespace Engine
         }
 
         InitializeCamera(renderDesc.Width, renderDesc.Height);
+        if (!InitializeApplicationRuntime())
+        {
+            Core::Logger::Error("Engine", "Failed to initialize application runtime.");
+            Shutdown();
+            return false;
+        }
 
         mLastFrameTime = std::chrono::steady_clock::now();
 
@@ -258,6 +266,7 @@ namespace Engine
 
         Core::Logger::Info("Engine", "Engine loop initialized.");
         Core::Logger::Info("Engine", BuildApplicationModeLogLine());
+        Core::Logger::Info("Engine", BuildApplicationRuntimeLogLine());
         LogFrameLimiterState();
         Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
         Core::Logger::Info("Camera", BuildCameraDebugLogLine());
@@ -316,6 +325,7 @@ namespace Engine
     void EngineLoop::Shutdown()
     {
         mRunning = false;
+        ShutdownApplicationRuntime();
 
         if (mCameraController)
         {
@@ -350,6 +360,8 @@ namespace Engine
 
         mBaseWindowTitle.clear();
         mApplicationMode = EApplicationMode::Unknown;
+        mApplicationRuntime = nullptr;
+        mApplicationRuntimeInitialized = false;
 
         mCameraControlEnabled = true;
 
@@ -368,6 +380,7 @@ namespace Engine
         {
             Core::Logger::Info("Engine", BuildFrameStatsLogLine(mFrameStats.GetSnapshot()));
             Core::Logger::Info("Engine", BuildApplicationModeLogLine());
+            Core::Logger::Info("Engine", BuildApplicationRuntimeLogLine());
             Core::Logger::Info("Engine", BuildFrameLimiterLogLine());
             Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
             Core::Logger::Info("Input", BuildInputDebugLogLine());
@@ -398,6 +411,7 @@ namespace Engine
         }
 
         UpdateCamera(deltaSeconds);
+        TickApplicationRuntime(deltaSeconds);
 
         if (mInputSystem && mInputSystem->IsMouseButtonPressed(Platform::MouseButton::Left))
         {
@@ -435,6 +449,7 @@ namespace Engine
         mRenderSystem->BeginFrame(frameInfo);
 
         QueueDefaultDebugDraw();
+        RenderApplicationRuntimeDebug();
 
         mRenderSystem->RenderDebug();
 
@@ -509,6 +524,86 @@ namespace Engine
     bool EngineLoop::IsEditorRuntimeMode() const
     {
         return mApplicationMode == EApplicationMode::LevelEditor;
+    }
+
+    FApplicationRuntimeContext EngineLoop::BuildApplicationRuntimeContext() const
+    {
+        FApplicationRuntimeContext context {};
+        context.ApplicationMode = mApplicationMode;
+        context.InputSystem = mInputSystem.get();
+        context.RenderSystem = mRenderSystem.get();
+        context.MainCamera = mCamera.get();
+        context.MainCameraController = mCameraController.get();
+
+        return context;
+    }
+
+    bool EngineLoop::InitializeApplicationRuntime()
+    {
+        if (!mApplicationRuntime)
+        {
+            mApplicationRuntimeInitialized = false;
+            return true;
+        }
+
+        const FApplicationRuntimeContext context = BuildApplicationRuntimeContext();
+
+        if (!mApplicationRuntime->Initialize(context))
+        {
+            mApplicationRuntimeInitialized = false;
+            return false;
+        }
+
+        mApplicationRuntimeInitialized = true;
+
+        Core::Logger::Info("Engine", BuildApplicationRuntimeLogLine());
+
+        return true;
+    }
+
+    void EngineLoop::ShutdownApplicationRuntime()
+    {
+        if (mApplicationRuntime && mApplicationRuntimeInitialized)
+        {
+            mApplicationRuntime->Shutdown();
+        }
+
+        mApplicationRuntimeInitialized = false;
+    }
+
+    void EngineLoop::TickApplicationRuntime(const double deltaSeconds)
+    {
+        if (!mApplicationRuntime || !mApplicationRuntimeInitialized)
+            return;
+
+        mApplicationRuntime->Tick(deltaSeconds);
+    }
+
+    void EngineLoop::RenderApplicationRuntimeDebug()
+    {
+        if (!mApplicationRuntime || !mApplicationRuntimeInitialized)
+            return;
+
+        mApplicationRuntime->RenderDebug();
+    }
+
+    Core::String EngineLoop::BuildApplicationRuntimeLogLine() const
+    {
+        std::ostringstream stream;
+
+        stream << "ApplicationRuntime: "
+               << "Available="
+               << (mApplicationRuntime ? "true" : "false")
+               << ", Initialized="
+               << (mApplicationRuntimeInitialized ? "true" : "false");
+
+        if (mApplicationRuntime)
+        {
+            stream << ", Name="
+                   << mApplicationRuntime->GetRuntimeName();
+        }
+
+        return stream.str();
     }
 
     Core::String EngineLoop::BuildApplicationModeLogLine() const
