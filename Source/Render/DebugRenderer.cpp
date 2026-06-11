@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <cstring>
 #include <d3dcompiler.h>
-#include <vector>
 
 namespace Render
 {
@@ -202,12 +201,16 @@ float4 PSMain(PSInput input) : SV_TARGET
         if (FAILED(hr))
             return false;
 
+        mDebugLines.reserve(512);
+
         mInitialized = true;
         return true;
     }
 
     void DebugRenderer::Shutdown()
     {
+        mDebugLines.clear();
+
         mViewConstantBuffer.Reset();
         mDynamicLineVertexBuffer.Reset();
         mInputLayout.Reset();
@@ -217,9 +220,123 @@ float4 PSMain(PSInput input) : SV_TARGET
         mInitialized = false;
     }
 
+    void DebugRenderer::ClearDebugDraw()
+    {
+        mDebugLines.clear();
+    }
+
+    bool DebugRenderer::AddDebugLine(
+        const Core::Vector3& start,
+        const Core::Vector3& end,
+        const FRenderColor& color
+    )
+    {
+        if ((mDebugLines.size() + 1) * 2 > MaxDebugLineVertices)
+            return false;
+
+        FDebugLine line {};
+        line.Start = start;
+        line.End = end;
+        line.Color = color;
+
+        mDebugLines.push_back(line);
+        return true;
+    }
+
+    void DebugRenderer::AddDebugGrid(
+        Core::i32 halfSize,
+        Core::f32 spacing,
+        const FRenderColor& lineColor,
+        const FRenderColor& centerLineColor
+    )
+    {
+        if (halfSize < 1)
+            halfSize = 1;
+
+        if (spacing <= 0.001f)
+            spacing = 1.0f;
+
+        const Core::f32 gridExtent = static_cast<Core::f32>(halfSize) * spacing;
+
+        for (Core::i32 lineIndex = -halfSize; lineIndex <= halfSize; ++lineIndex)
+        {
+            const Core::f32 coordinate = static_cast<Core::f32>(lineIndex) * spacing;
+            const FRenderColor& color = lineIndex == 0 ? centerLineColor : lineColor;
+
+            AddDebugLine(
+                Core::Vector3(-gridExtent, 0.0f, coordinate),
+                Core::Vector3( gridExtent, 0.0f, coordinate),
+                color
+            );
+
+            AddDebugLine(
+                Core::Vector3(coordinate, 0.0f, -gridExtent),
+                Core::Vector3(coordinate, 0.0f,  gridExtent),
+                color
+            );
+        }
+    }
+
+    void DebugRenderer::AddDebugAxes(Core::f32 length)
+    {
+        if (length <= 0.001f)
+            length = 1.0f;
+
+        FRenderColor axisXColor {};
+        axisXColor.R = 1.00f;
+        axisXColor.G = 0.15f;
+        axisXColor.B = 0.10f;
+        axisXColor.A = 1.0f;
+
+        FRenderColor axisYColor {};
+        axisYColor.R = 0.15f;
+        axisYColor.G = 1.00f;
+        axisYColor.B = 0.20f;
+        axisYColor.A = 1.0f;
+
+        FRenderColor axisZColor {};
+        axisZColor.R = 0.15f;
+        axisZColor.G = 0.35f;
+        axisZColor.B = 1.00f;
+        axisZColor.A = 1.0f;
+
+        AddDebugLine(
+            Core::Vector3(0.0f, 0.02f, 0.0f),
+            Core::Vector3(length, 0.02f, 0.0f),
+            axisXColor
+        );
+
+        AddDebugLine(
+            Core::Vector3(0.0f, 0.02f, 0.0f),
+            Core::Vector3(0.0f, length, 0.0f),
+            axisYColor
+        );
+
+        AddDebugLine(
+            Core::Vector3(0.0f, 0.02f, 0.0f),
+            Core::Vector3(0.0f, 0.02f, length),
+            axisZColor
+        );
+    }
+
+    void DebugRenderer::AddDebugWireTriangle(
+        const Core::Vector3& a,
+        const Core::Vector3& b,
+        const Core::Vector3& c,
+        const FRenderColor& color
+    )
+    {
+        AddDebugLine(a, b, color);
+        AddDebugLine(b, c, color);
+        AddDebugLine(c, a, color);
+    }
+
     void DebugRenderer::DrawDebugPrimitives(DX11Device& device, const FRenderViewInfo& viewInfo)
     {
         if (!mInitialized)
+            return;
+
+        if (mDebugLines.empty())
             return;
 
         ID3D11DeviceContext* context = device.GetContext();
@@ -231,92 +348,34 @@ float4 PSMain(PSInput input) : SV_TARGET
             return;
 
         std::vector<FDebugVertex> vertices;
-        vertices.reserve(256);
+        vertices.reserve(mDebugLines.size() * 2);
 
-        auto addLine =
-            [&vertices](const Core::Vector3& start, const Core::Vector3& end, const float color[4])
-            {
-                if (vertices.size() + 2 > MaxDebugLineVertices)
-                    return;
-
-                FDebugVertex startVertex {};
-                startVertex.Position[0] = start.X;
-                startVertex.Position[1] = start.Y;
-                startVertex.Position[2] = start.Z;
-                startVertex.Color[0] = color[0];
-                startVertex.Color[1] = color[1];
-                startVertex.Color[2] = color[2];
-                startVertex.Color[3] = color[3];
-
-                FDebugVertex endVertex {};
-                endVertex.Position[0] = end.X;
-                endVertex.Position[1] = end.Y;
-                endVertex.Position[2] = end.Z;
-                endVertex.Color[0] = color[0];
-                endVertex.Color[1] = color[1];
-                endVertex.Color[2] = color[2];
-                endVertex.Color[3] = color[3];
-
-                vertices.push_back(startVertex);
-                vertices.push_back(endVertex);
-            };
-
-        const float gridColor[4] = { 0.22f, 0.22f, 0.22f, 1.0f };
-        const float gridCenterColor[4] = { 0.38f, 0.38f, 0.38f, 1.0f };
-
-        const float axisXColor[4] = { 1.00f, 0.15f, 0.10f, 1.0f };
-        const float axisYColor[4] = { 0.15f, 1.00f, 0.20f, 1.0f };
-        const float axisZColor[4] = { 0.15f, 0.35f, 1.00f, 1.0f };
-
-        const float triangleColor[4] = { 1.00f, 0.85f, 0.20f, 1.0f };
-
-        constexpr int GridHalfSize = 10;
-        constexpr float GridSpacing = 1.0f;
-        constexpr float GridExtent = static_cast<float>(GridHalfSize) * GridSpacing;
-
-        for (int lineIndex = -GridHalfSize; lineIndex <= GridHalfSize; ++lineIndex)
+        for (const FDebugLine& line : mDebugLines)
         {
-            const float coordinate = static_cast<float>(lineIndex) * GridSpacing;
-            const float* color = lineIndex == 0 ? gridCenterColor : gridColor;
+            if (vertices.size() + 2 > MaxDebugLineVertices)
+                break;
 
-            addLine(
-                Core::Vector3(-GridExtent, 0.0f, coordinate),
-                Core::Vector3( GridExtent, 0.0f, coordinate),
-                color
-            );
+            FDebugVertex startVertex {};
+            startVertex.Position[0] = line.Start.X;
+            startVertex.Position[1] = line.Start.Y;
+            startVertex.Position[2] = line.Start.Z;
+            startVertex.Color[0] = line.Color.R;
+            startVertex.Color[1] = line.Color.G;
+            startVertex.Color[2] = line.Color.B;
+            startVertex.Color[3] = line.Color.A;
 
-            addLine(
-                Core::Vector3(coordinate, 0.0f, -GridExtent),
-                Core::Vector3(coordinate, 0.0f,  GridExtent),
-                color
-            );
+            FDebugVertex endVertex {};
+            endVertex.Position[0] = line.End.X;
+            endVertex.Position[1] = line.End.Y;
+            endVertex.Position[2] = line.End.Z;
+            endVertex.Color[0] = line.Color.R;
+            endVertex.Color[1] = line.Color.G;
+            endVertex.Color[2] = line.Color.B;
+            endVertex.Color[3] = line.Color.A;
+
+            vertices.push_back(startVertex);
+            vertices.push_back(endVertex);
         }
-
-        addLine(
-            Core::Vector3(0.0f, 0.02f, 0.0f),
-            Core::Vector3(3.0f, 0.02f, 0.0f),
-            axisXColor
-        );
-
-        addLine(
-            Core::Vector3(0.0f, 0.02f, 0.0f),
-            Core::Vector3(0.0f, 3.0f, 0.0f),
-            axisYColor
-        );
-
-        addLine(
-            Core::Vector3(0.0f, 0.02f, 0.0f),
-            Core::Vector3(0.0f, 0.02f, 3.0f),
-            axisZColor
-        );
-
-        const Core::Vector3 triangleA( 0.0f, 2.35f, 4.0f);
-        const Core::Vector3 triangleB( 1.0f, 1.00f, 4.0f);
-        const Core::Vector3 triangleC(-1.0f, 1.00f, 4.0f);
-
-        addLine(triangleA, triangleB, triangleColor);
-        addLine(triangleB, triangleC, triangleColor);
-        addLine(triangleC, triangleA, triangleColor);
 
         if (vertices.empty())
             return;

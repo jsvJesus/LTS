@@ -419,6 +419,34 @@ namespace Engine
 
         mRenderSystem->BeginFrame(frameInfo);
 
+        Render::FRenderColor gridColor {};
+        gridColor.R = 0.22f;
+        gridColor.G = 0.22f;
+        gridColor.B = 0.22f;
+        gridColor.A = 1.0f;
+
+        Render::FRenderColor gridCenterColor {};
+        gridCenterColor.R = 0.38f;
+        gridCenterColor.G = 0.38f;
+        gridCenterColor.B = 0.38f;
+        gridCenterColor.A = 1.0f;
+
+        Render::FRenderColor triangleColor {};
+        triangleColor.R = 1.00f;
+        triangleColor.G = 0.85f;
+        triangleColor.B = 0.20f;
+        triangleColor.A = 1.0f;
+
+        mRenderSystem->DrawDebugGrid(10, 1.0f, gridColor, gridCenterColor);
+        mRenderSystem->DrawDebugAxes(3.0f);
+
+        mRenderSystem->DrawDebugWireTriangle(
+            Core::Vector3( 0.0f, 2.35f, 4.0f),
+            Core::Vector3( 1.0f, 1.00f, 4.0f),
+            Core::Vector3(-1.0f, 1.00f, 4.0f),
+            triangleColor
+        );
+
         mRenderSystem->RenderDebug();
 
         mRenderSystem->EndFrame();

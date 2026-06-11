@@ -25,6 +25,13 @@ namespace Render
         std::uint32_t Height = 720;
     };
 
+    struct FDebugLine
+    {
+        Core::Vector3 Start = Core::Vector3::Zero();
+        Core::Vector3 End = Core::Vector3::Zero();
+        FRenderColor Color {};
+    };
+
     struct FRenderViewInfo
     {
         Core::Matrix4 ViewMatrix = Core::Matrix4::Identity();

@@ -93,6 +93,8 @@ namespace Render
             mCurrentViewInfo = frameInfo.ViewInfo;
         }
 
+        ClearDebugDraw();
+
         mDevice->BeginFrame(mDesc.ClearColor);
     }
 
@@ -124,6 +126,60 @@ namespace Render
             return false;
 
         return mDevice->Resize(width, height);
+    }
+
+    void RenderSystem::ClearDebugDraw()
+    {
+        if (!mDebugRenderer)
+            return;
+
+        mDebugRenderer->ClearDebugDraw();
+    }
+
+    bool RenderSystem::DrawDebugLine(
+        const Core::Vector3& start,
+        const Core::Vector3& end,
+        const FRenderColor& color
+    )
+    {
+        if (!mDebugRenderer)
+            return false;
+
+        return mDebugRenderer->AddDebugLine(start, end, color);
+    }
+
+    void RenderSystem::DrawDebugGrid(
+        const Core::i32 halfSize,
+        const Core::f32 spacing,
+        const FRenderColor& lineColor,
+        const FRenderColor& centerLineColor
+    )
+    {
+        if (!mDebugRenderer)
+            return;
+
+        mDebugRenderer->AddDebugGrid(halfSize, spacing, lineColor, centerLineColor);
+    }
+
+    void RenderSystem::DrawDebugAxes(const Core::f32 length)
+    {
+        if (!mDebugRenderer)
+            return;
+
+        mDebugRenderer->AddDebugAxes(length);
+    }
+
+    void RenderSystem::DrawDebugWireTriangle(
+        const Core::Vector3& a,
+        const Core::Vector3& b,
+        const Core::Vector3& c,
+        const FRenderColor& color
+    )
+    {
+        if (!mDebugRenderer)
+            return;
+
+        mDebugRenderer->AddDebugWireTriangle(a, b, c, color);
     }
 
     void RenderSystem::SetClearColor(const FRenderColor& color)

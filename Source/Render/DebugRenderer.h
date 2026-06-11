@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include <d3d11.h>
 #include <wrl/client.h>
@@ -23,6 +24,30 @@ namespace Render
         bool Initialize(DX11Device& device);
         void Shutdown();
 
+        void ClearDebugDraw();
+
+        bool AddDebugLine(
+            const Core::Vector3& start,
+            const Core::Vector3& end,
+            const FRenderColor& color
+        );
+
+        void AddDebugGrid(
+            Core::i32 halfSize,
+            Core::f32 spacing,
+            const FRenderColor& lineColor,
+            const FRenderColor& centerLineColor
+        );
+
+        void AddDebugAxes(Core::f32 length);
+
+        void AddDebugWireTriangle(
+            const Core::Vector3& a,
+            const Core::Vector3& b,
+            const Core::Vector3& c,
+            const FRenderColor& color
+        );
+
         void DrawDebugPrimitives(DX11Device& device, const FRenderViewInfo& viewInfo);
 
     private:
@@ -41,6 +66,8 @@ namespace Render
 
     private:
         bool mInitialized = false;
+
+        std::vector<FDebugLine> mDebugLines;
 
         Microsoft::WRL::ComPtr<ID3D11VertexShader> mVertexShader;
         Microsoft::WRL::ComPtr<ID3D11PixelShader> mPixelShader;

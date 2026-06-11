@@ -28,6 +28,30 @@ namespace Render
 
         bool Resize(std::uint32_t width, std::uint32_t height);
 
+        void ClearDebugDraw();
+
+        bool DrawDebugLine(
+            const Core::Vector3& start,
+            const Core::Vector3& end,
+            const FRenderColor& color
+        );
+
+        void DrawDebugGrid(
+            Core::i32 halfSize,
+            Core::f32 spacing,
+            const FRenderColor& lineColor,
+            const FRenderColor& centerLineColor
+        );
+
+        void DrawDebugAxes(Core::f32 length);
+
+        void DrawDebugWireTriangle(
+            const Core::Vector3& a,
+            const Core::Vector3& b,
+            const Core::Vector3& c,
+            const FRenderColor& color
+        );
+
         void SetClearColor(const FRenderColor& color);
         [[nodiscard]] const FRenderColor& GetClearColor() const;
 
