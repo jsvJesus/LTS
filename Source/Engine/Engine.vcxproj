@@ -160,6 +160,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Camera\Camera.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="EngineLoop.cpp" />
     <ClCompile Include="FrameLimiter.cpp" />
@@ -167,6 +168,7 @@
     <ClCompile Include="FrameTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Camera\Camera.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="EngineLoop.h" />
     <ClInclude Include="FrameLimiter.h" />

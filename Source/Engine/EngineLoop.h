@@ -23,6 +23,8 @@ namespace Render
 
 namespace Engine
 {
+    class Camera;
+
     class EngineLoop final
     {
     public:
@@ -53,6 +55,12 @@ namespace Engine
         void ToggleCursorLock();
         Core::String BuildInputDebugLogLine() const;
 
+        void InitializeCamera(std::uint32_t width, std::uint32_t height);
+        void UpdateCamera(double deltaSeconds);
+        void UpdateCameraAspectRatio();
+        void ToggleCameraControl();
+        Core::String BuildCameraDebugLogLine() const;
+
     private:
         bool mInitialized = false;
         bool mRunning = false;
@@ -67,9 +75,12 @@ namespace Engine
         FrameStats mFrameStats;
         FrameLimiter mFrameLimiter;
 
+        bool mCameraControlEnabled = true;
+
         std::unique_ptr<Platform::Window> mWindow;
         std::unique_ptr<Platform::InputSystem> mInputSystem;
         std::unique_ptr<Render::RenderSystem> mRenderSystem;
+        std::unique_ptr<Camera> mCamera;
 
         std::chrono::steady_clock::time_point mLastFrameTime {};
     };

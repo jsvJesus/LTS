@@ -1,5 +1,7 @@
 #include "EngineLoop.h"
 
+#include "Camera/Camera.h"
+
 #include "../Core/Logger.h"
 #include "../Platform/Input.h"
 #include "../Platform/Window.h"
@@ -86,6 +88,11 @@ namespace Engine
             }
         }
 
+        Core::StringView GetEnabledName(const bool enabled)
+        {
+            return enabled ? "On" : "Off";
+        }
+
         Core::String BuildDebugTitle(
             const Core::String& baseTitle,
             const Core::i32 width,
@@ -93,7 +100,8 @@ namespace Engine
             const FFrameStatsSnapshot& stats,
             const FFrameLimiterSnapshot& limiter,
             const bool debugRenderingEnabled,
-            const Platform::CursorMode cursorMode
+            const Platform::CursorMode cursorMode,
+            const bool cameraControlEnabled
         )
         {
             std::ostringstream stream;
@@ -128,10 +136,13 @@ namespace Engine
             }
 
             stream << " | DebugDraw: "
-                   << (debugRenderingEnabled ? "On" : "Off");
+                   << GetEnabledName(debugRenderingEnabled);
 
             stream << " | Cursor: "
                    << GetCursorModeName(cursorMode);
+
+            stream << " | Camera: "
+                   << GetEnabledName(cameraControlEnabled);
 
             return stream.str();
         }
@@ -230,6 +241,8 @@ namespace Engine
             return false;
         }
 
+        InitializeCamera(renderDesc.Width, renderDesc.Height);
+
         mLastFrameTime = std::chrono::steady_clock::now();
 
         mFrameIndex = 0;
@@ -241,6 +254,7 @@ namespace Engine
         Core::Logger::Info("Engine", "Engine loop initialized.");
         LogFrameLimiterState();
         Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
+        Core::Logger::Info("Camera", BuildCameraDebugLogLine());
 
         return true;
     }
@@ -296,6 +310,11 @@ namespace Engine
     {
         mRunning = false;
 
+        if (mCamera)
+        {
+            mCamera.reset();
+        }
+
         if (mRenderSystem)
         {
             mRenderSystem->Shutdown();
@@ -319,14 +338,14 @@ namespace Engine
 
         mBaseWindowTitle.clear();
 
+        mCameraControlEnabled = true;
+
         mFrameIndex = 0;
         mInitialized = false;
     }
 
-    void EngineLoop::Tick(double deltaSeconds)
+    void EngineLoop::Tick(const double deltaSeconds)
     {
-        (void)deltaSeconds;
-
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F1))
         {
             Core::Logger::Info("Input", "F1 pressed.");
@@ -338,6 +357,7 @@ namespace Engine
             Core::Logger::Info("Engine", BuildFrameLimiterLogLine());
             Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
             Core::Logger::Info("Input", BuildInputDebugLogLine());
+            Core::Logger::Info("Camera", BuildCameraDebugLogLine());
         }
 
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F3))
@@ -351,10 +371,18 @@ namespace Engine
         {
             ToggleDebugRendering();
         }
+
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F5))
         {
             ToggleCursorLock();
         }
+
+        if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F6))
+        {
+            ToggleCameraControl();
+        }
+
+        UpdateCamera(deltaSeconds);
 
         if (mInputSystem && mInputSystem->IsMouseButtonPressed(Platform::MouseButton::Left))
         {
@@ -363,8 +391,8 @@ namespace Engine
 
         // Позже тут будут:
         // input mapping
-        // editor camera
-        // game camera
+        // editor camera routing
+        // game camera routing
         // world tick
         // editor tick
         // game tick
@@ -404,6 +432,7 @@ namespace Engine
             return;
 
         mRenderSystem->Resize(width, height);
+        UpdateCameraAspectRatio();
         UpdateWindowDebugTitle();
     }
 
@@ -432,6 +461,9 @@ namespace Engine
         const Platform::CursorMode cursorMode =
             mInputSystem ? mInputSystem->GetCursorMode() : Platform::CursorMode::Normal;
 
+        const bool cameraControlEnabled =
+            mCamera && mCameraControlEnabled;
+
         const Core::String title = BuildDebugTitle(
             mBaseWindowTitle,
             mWindow->GetWidth(),
@@ -439,7 +471,8 @@ namespace Engine
             mFrameStats.GetSnapshot(),
             mFrameLimiter.GetSnapshot(),
             debugRenderingEnabled,
-            cursorMode
+            cursorMode,
+            cameraControlEnabled
         );
 
         mWindow->SetTitle(title);
@@ -551,6 +584,112 @@ namespace Engine
                << ", "
                << mInputSystem->GetRawMouseDeltaY()
                << ")";
+
+        return stream.str();
+    }
+
+    void EngineLoop::InitializeCamera(const std::uint32_t width, const std::uint32_t height)
+    {
+        mCamera = std::make_unique<Camera>();
+
+        FCameraDesc cameraDesc {};
+        cameraDesc.AspectRatio = height > 0
+            ? static_cast<Core::f32>(width) / static_cast<Core::f32>(height)
+            : 16.0f / 9.0f;
+
+        mCamera->Initialize(cameraDesc);
+
+        mCameraControlEnabled = true;
+    }
+
+    void EngineLoop::UpdateCamera(const double deltaSeconds)
+    {
+        if (!mCamera || !mInputSystem || !mCameraControlEnabled)
+            return;
+
+        mCamera->UpdateFromInput(*mInputSystem, deltaSeconds);
+    }
+
+    void EngineLoop::UpdateCameraAspectRatio()
+    {
+        if (!mCamera || !mWindow)
+            return;
+
+        const Core::i32 windowWidth = mWindow->GetWidth();
+        const Core::i32 windowHeight = mWindow->GetHeight();
+
+        if (windowWidth <= 0 || windowHeight <= 0)
+            return;
+
+        const Core::f32 aspectRatio =
+            static_cast<Core::f32>(windowWidth) / static_cast<Core::f32>(windowHeight);
+
+        mCamera->SetAspectRatio(aspectRatio);
+    }
+
+    void EngineLoop::ToggleCameraControl()
+    {
+        if (!mCamera)
+            return;
+
+        mCameraControlEnabled = !mCameraControlEnabled;
+
+        Core::Logger::Info("Camera", BuildCameraDebugLogLine());
+
+        UpdateWindowDebugTitle();
+    }
+
+    Core::String EngineLoop::BuildCameraDebugLogLine() const
+    {
+        std::ostringstream stream;
+
+        if (!mCamera)
+        {
+            stream << "Camera: not available";
+            return stream.str();
+        }
+
+        const Core::Vector3& position = mCamera->GetPosition();
+        const Core::Rotator& rotation = mCamera->GetRotation();
+
+        stream << "Camera: "
+               << "Control="
+               << (mCameraControlEnabled ? "enabled" : "disabled")
+               << ", Position=("
+               << std::fixed
+               << std::setprecision(2)
+               << position.X
+               << ", "
+               << position.Y
+               << ", "
+               << position.Z
+               << ")"
+               << ", Rotation=("
+               << "Pitch="
+               << std::fixed
+               << std::setprecision(2)
+               << rotation.Pitch
+               << ", Yaw="
+               << rotation.Yaw
+               << ", Roll="
+               << rotation.Roll
+               << ")"
+               << ", FOVY="
+               << std::fixed
+               << std::setprecision(1)
+               << mCamera->GetFieldOfViewYDegrees()
+               << ", Near="
+               << std::fixed
+               << std::setprecision(3)
+               << mCamera->GetNearPlane()
+               << ", Far="
+               << std::fixed
+               << std::setprecision(1)
+               << mCamera->GetFarPlane()
+               << ", Aspect="
+               << std::fixed
+               << std::setprecision(3)
+               << mCamera->GetAspectRatio();
 
         return stream.str();
     }
