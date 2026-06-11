@@ -47,6 +47,9 @@ namespace Engine
         void LogFrameLimiterState() const;
         Core::String BuildFrameLimiterLogLine() const;
 
+        void ToggleDebugRendering();
+        Core::String BuildDebugRenderingLogLine() const;
+
     private:
         bool mInitialized = false;
         bool mRunning = false;

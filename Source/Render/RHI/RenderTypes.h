@@ -34,6 +34,7 @@ namespace Render
 
         bool EnableDebugLayer = false;
         bool EnableDebugRenderer = true;
+        bool EnableDebugRendering = true;
         bool EnableVSync = true;
 
         FRenderColor ClearColor {};

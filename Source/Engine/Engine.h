@@ -4,6 +4,14 @@
 
 namespace Engine
 {
+    struct FApplicationColor final
+    {
+        float R = 0.015f;
+        float G = 0.016f;
+        float B = 0.020f;
+        float A = 1.0f;
+    };
+
     struct FApplicationDesc
     {
         const char* ApplicationName = "Application";
@@ -19,7 +27,10 @@ namespace Engine
         bool LogToFile = true;
 
         bool EnableDebugRenderer = true;
+        bool EnableDebugRendering = true;
         bool EnableVSync = true;
+
+        FApplicationColor ClearColor {};
 
         bool EnableFrameStatsTitle = true;
         double FrameStatsTitleUpdateIntervalSeconds = 0.5;

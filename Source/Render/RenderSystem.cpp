@@ -6,7 +6,7 @@
 namespace Render
 {
     RenderSystem::RenderSystem() = default;
-    
+
     RenderSystem::~RenderSystem()
     {
         Shutdown();
@@ -26,6 +26,7 @@ namespace Render
             return false;
 
         mDesc = desc;
+        mDebugRenderingEnabled = false;
 
         mDevice = std::make_unique<DX11Device>();
 
@@ -49,6 +50,8 @@ namespace Render
                 Shutdown();
                 return false;
             }
+
+            mDebugRenderingEnabled = desc.EnableDebugRendering;
         }
 
         mInitialized = true;
@@ -69,6 +72,7 @@ namespace Render
             mDevice.reset();
         }
 
+        mDebugRenderingEnabled = false;
         mInitialized = false;
     }
 
@@ -85,6 +89,9 @@ namespace Render
     void RenderSystem::RenderDebug()
     {
         if (!mInitialized || !mDevice || !mDebugRenderer)
+            return;
+
+        if (!mDebugRenderingEnabled)
             return;
 
         mDebugRenderer->DrawDebugTriangle(*mDevice);
@@ -104,6 +111,38 @@ namespace Render
             return false;
 
         return mDevice->Resize(width, height);
+    }
+
+    void RenderSystem::SetClearColor(const FRenderColor& color)
+    {
+        mDesc.ClearColor = color;
+    }
+
+    const FRenderColor& RenderSystem::GetClearColor() const
+    {
+        return mDesc.ClearColor;
+    }
+
+    bool RenderSystem::SetDebugRenderingEnabled(const bool enabled)
+    {
+        if (!mDebugRenderer)
+        {
+            mDebugRenderingEnabled = false;
+            return false;
+        }
+
+        mDebugRenderingEnabled = enabled;
+        return true;
+    }
+
+    bool RenderSystem::ToggleDebugRendering()
+    {
+        return SetDebugRenderingEnabled(!mDebugRenderingEnabled);
+    }
+
+    bool RenderSystem::IsDebugRendererAvailable() const
+    {
+        return mDebugRenderer != nullptr;
     }
 
     std::uint32_t RenderSystem::GetWidth() const

@@ -28,13 +28,22 @@ namespace Render
 
         bool Resize(std::uint32_t width, std::uint32_t height);
 
-        bool IsInitialized() const { return mInitialized; }
+        void SetClearColor(const FRenderColor& color);
+        [[nodiscard]] const FRenderColor& GetClearColor() const;
+
+        bool SetDebugRenderingEnabled(bool enabled);
+        bool ToggleDebugRendering();
+
+        [[nodiscard]] bool IsInitialized() const { return mInitialized; }
+        [[nodiscard]] bool IsDebugRendererAvailable() const;
+        [[nodiscard]] bool IsDebugRenderingEnabled() const { return mDebugRenderingEnabled; }
 
         std::uint32_t GetWidth() const;
         std::uint32_t GetHeight() const;
 
     private:
         bool mInitialized = false;
+        bool mDebugRenderingEnabled = false;
 
         FRenderSystemDesc mDesc {};
 

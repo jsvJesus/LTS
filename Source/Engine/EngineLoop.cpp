@@ -58,12 +58,23 @@ namespace Engine
             return result;
         }
 
+        Render::FRenderColor ToRenderColor(const FApplicationColor& color)
+        {
+            Render::FRenderColor result {};
+            result.R = color.R;
+            result.G = color.G;
+            result.B = color.B;
+            result.A = color.A;
+            return result;
+        }
+
         Core::String BuildDebugTitle(
             const Core::String& baseTitle,
             const Core::i32 width,
             const Core::i32 height,
             const FFrameStatsSnapshot& stats,
-            const FFrameLimiterSnapshot& limiter
+            const FFrameLimiterSnapshot& limiter,
+            const bool debugRenderingEnabled
         )
         {
             std::ostringstream stream;
@@ -96,6 +107,9 @@ namespace Engine
             {
                 stream << " | Limit: Off";
             }
+
+            stream << " | DebugDraw: "
+                   << (debugRenderingEnabled ? "On" : "Off");
 
             return stream.str();
         }
@@ -182,12 +196,9 @@ namespace Engine
 #endif
 
         renderDesc.EnableDebugRenderer = desc.EnableDebugRenderer;
+        renderDesc.EnableDebugRendering = desc.EnableDebugRendering;
         renderDesc.EnableVSync = desc.EnableVSync;
-
-        renderDesc.ClearColor.R = 0.015f;
-        renderDesc.ClearColor.G = 0.016f;
-        renderDesc.ClearColor.B = 0.020f;
-        renderDesc.ClearColor.A = 1.0f;
+        renderDesc.ClearColor = ToRenderColor(desc.ClearColor);
 
         mRenderSystem = std::make_unique<Render::RenderSystem>();
 
@@ -207,6 +218,7 @@ namespace Engine
 
         Core::Logger::Info("Engine", "Engine loop initialized.");
         LogFrameLimiterState();
+        Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
 
         return true;
     }
@@ -302,6 +314,7 @@ namespace Engine
         {
             Core::Logger::Info("Engine", BuildFrameStatsLogLine(mFrameStats.GetSnapshot()));
             Core::Logger::Info("Engine", BuildFrameLimiterLogLine());
+            Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
         }
 
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F3))
@@ -309,6 +322,11 @@ namespace Engine
             mFrameLimiter.ToggleEnabled();
             LogFrameLimiterState();
             UpdateWindowDebugTitle();
+        }
+
+        if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F4))
+        {
+            ToggleDebugRendering();
         }
 
         if (mInputSystem && mInputSystem->IsMouseButtonPressed(Platform::MouseButton::Left))
@@ -381,12 +399,16 @@ namespace Engine
         if (!mEnableFrameStatsTitle || !mWindow)
             return;
 
+        const bool debugRenderingEnabled =
+            mRenderSystem && mRenderSystem->IsDebugRenderingEnabled();
+
         const Core::String title = BuildDebugTitle(
             mBaseWindowTitle,
             mWindow->GetWidth(),
             mWindow->GetHeight(),
             mFrameStats.GetSnapshot(),
-            mFrameLimiter.GetSnapshot()
+            mFrameLimiter.GetSnapshot(),
+            debugRenderingEnabled
         );
 
         mWindow->SetTitle(title);
@@ -418,6 +440,40 @@ namespace Engine
                << std::fixed
                << std::setprecision(2)
                << limiter.LastSleepMilliseconds;
+
+        return stream.str();
+    }
+
+    void EngineLoop::ToggleDebugRendering()
+    {
+        if (!mRenderSystem)
+            return;
+
+        if (!mRenderSystem->IsDebugRendererAvailable())
+        {
+            Core::Logger::Warning("Engine", "Debug rendering toggle ignored. Debug renderer is not available.");
+            return;
+        }
+
+        mRenderSystem->ToggleDebugRendering();
+
+        Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
+
+        UpdateWindowDebugTitle();
+    }
+
+    Core::String EngineLoop::BuildDebugRenderingLogLine() const
+    {
+        const bool available = mRenderSystem && mRenderSystem->IsDebugRendererAvailable();
+        const bool enabled = mRenderSystem && mRenderSystem->IsDebugRenderingEnabled();
+
+        std::ostringstream stream;
+
+        stream << "DebugRendering: "
+               << "Available="
+               << (available ? "true" : "false")
+               << ", Enabled="
+               << (enabled ? "true" : "false");
 
         return stream.str();
     }
