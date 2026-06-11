@@ -27,6 +27,8 @@ namespace Render
 
         mDesc = desc;
         mDebugRenderingEnabled = false;
+        mHasCurrentViewInfo = false;
+        mCurrentViewInfo = FRenderViewInfo {};
 
         mDevice = std::make_unique<DX11Device>();
 
@@ -72,16 +74,24 @@ namespace Render
             mDevice.reset();
         }
 
+        mHasCurrentViewInfo = false;
+        mCurrentViewInfo = FRenderViewInfo {};
+
         mDebugRenderingEnabled = false;
         mInitialized = false;
     }
 
     void RenderSystem::BeginFrame(const FRenderFrameInfo& frameInfo)
     {
-        (void)frameInfo;
-
         if (!mInitialized || !mDevice)
             return;
+
+        mHasCurrentViewInfo = frameInfo.HasViewInfo;
+
+        if (frameInfo.HasViewInfo)
+        {
+            mCurrentViewInfo = frameInfo.ViewInfo;
+        }
 
         mDevice->BeginFrame(mDesc.ClearColor);
     }
@@ -94,7 +104,10 @@ namespace Render
         if (!mDebugRenderingEnabled)
             return;
 
-        mDebugRenderer->DrawDebugTriangle(*mDevice);
+        if (!mHasCurrentViewInfo)
+            return;
+
+        mDebugRenderer->DrawDebugTriangle(*mDevice, mCurrentViewInfo);
     }
 
     void RenderSystem::EndFrame()

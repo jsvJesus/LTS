@@ -407,6 +407,16 @@ namespace Engine
         frameInfo.DeltaSeconds = deltaSeconds;
         frameInfo.FrameIndex = mFrameIndex;
 
+        if (mCamera)
+        {
+            frameInfo.HasViewInfo = true;
+            frameInfo.ViewInfo.ViewMatrix = mCamera->GetViewMatrix();
+            frameInfo.ViewInfo.ProjectionMatrix = mCamera->GetProjectionMatrix();
+            frameInfo.ViewInfo.ViewProjectionMatrix =
+                mCamera->GetViewMatrix() * mCamera->GetProjectionMatrix();
+            frameInfo.ViewInfo.CameraPosition = mCamera->GetPosition();
+        }
+
         mRenderSystem->BeginFrame(frameInfo);
 
         mRenderSystem->RenderDebug();

@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "Core/Math/Math.h"
+
 namespace Render
 {
     enum class ERenderBackend : std::uint8_t
@@ -21,6 +23,15 @@ namespace Render
     {
         std::uint32_t Width = 1280;
         std::uint32_t Height = 720;
+    };
+
+    struct FRenderViewInfo
+    {
+        Core::Matrix4 ViewMatrix = Core::Matrix4::Identity();
+        Core::Matrix4 ProjectionMatrix = Core::Matrix4::Identity();
+        Core::Matrix4 ViewProjectionMatrix = Core::Matrix4::Identity();
+
+        Core::Vector3 CameraPosition = Core::Vector3::Zero();
     };
 
     struct FRenderSystemDesc
@@ -44,5 +55,8 @@ namespace Render
     {
         double DeltaSeconds = 0.0;
         std::uint64_t FrameIndex = 0;
+
+        bool HasViewInfo = false;
+        FRenderViewInfo ViewInfo {};
     };
 }

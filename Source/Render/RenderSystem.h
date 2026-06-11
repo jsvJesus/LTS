@@ -38,12 +38,18 @@ namespace Render
         [[nodiscard]] bool IsDebugRendererAvailable() const;
         [[nodiscard]] bool IsDebugRenderingEnabled() const { return mDebugRenderingEnabled; }
 
+        [[nodiscard]] bool HasCurrentViewInfo() const { return mHasCurrentViewInfo; }
+        [[nodiscard]] const FRenderViewInfo& GetCurrentViewInfo() const { return mCurrentViewInfo; }
+
         std::uint32_t GetWidth() const;
         std::uint32_t GetHeight() const;
 
     private:
         bool mInitialized = false;
         bool mDebugRenderingEnabled = false;
+
+        bool mHasCurrentViewInfo = false;
+        FRenderViewInfo mCurrentViewInfo {};
 
         FRenderSystemDesc mDesc {};
 

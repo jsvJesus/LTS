@@ -6,13 +6,17 @@
 #include <cstddef>
 #include <cstring>
 #include <d3dcompiler.h>
-#include <iterator>
 
 namespace Render
 {
     namespace
     {
         constexpr const char* DebugTriangleShaderSource = R"(
+cbuffer DebugViewConstants : register(b0)
+{
+    row_major float4x4 ViewProjectionMatrix;
+};
+
 struct VSInput
 {
     float3 Position : POSITION;
@@ -28,7 +32,7 @@ struct PSInput
 PSInput VSMain(VSInput input)
 {
     PSInput output;
-    output.Position = float4(input.Position, 1.0f);
+    output.Position = mul(float4(input.Position, 1.0f), ViewProjectionMatrix);
     output.Color = input.Color;
     return output;
 }
@@ -165,28 +169,45 @@ float4 PSMain(PSInput input) : SV_TARGET
 
         const FDebugVertex vertices[] =
         {
-            { {  0.0f,  0.55f, 0.0f }, { 1.0f, 0.15f, 0.10f, 1.0f } },
-            { {  0.55f, -0.45f, 0.0f }, { 0.10f, 1.0f, 0.25f, 1.0f } },
-            { { -0.55f, -0.45f, 0.0f }, { 0.15f, 0.35f, 1.0f, 1.0f } }
+            { {  0.0f,  2.35f, 4.0f }, { 1.0f, 0.15f, 0.10f, 1.0f } },
+            { {  1.0f,  1.00f, 4.0f }, { 0.10f, 1.0f, 0.25f, 1.0f } },
+            { { -1.0f,  1.00f, 4.0f }, { 0.15f, 0.35f, 1.0f, 1.0f } }
         };
 
-        D3D11_BUFFER_DESC bufferDesc {};
-        bufferDesc.ByteWidth = static_cast<UINT>(sizeof(vertices));
-        bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        bufferDesc.CPUAccessFlags = 0;
-        bufferDesc.MiscFlags = 0;
-        bufferDesc.StructureByteStride = sizeof(FDebugVertex);
+        D3D11_BUFFER_DESC vertexBufferDesc {};
+        vertexBufferDesc.ByteWidth = static_cast<UINT>(sizeof(vertices));
+        vertexBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+        vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        vertexBufferDesc.CPUAccessFlags = 0;
+        vertexBufferDesc.MiscFlags = 0;
+        vertexBufferDesc.StructureByteStride = sizeof(FDebugVertex);
 
-        D3D11_SUBRESOURCE_DATA initialData {};
-        initialData.pSysMem = vertices;
-        initialData.SysMemPitch = 0;
-        initialData.SysMemSlicePitch = 0;
+        D3D11_SUBRESOURCE_DATA vertexInitialData {};
+        vertexInitialData.pSysMem = vertices;
+        vertexInitialData.SysMemPitch = 0;
+        vertexInitialData.SysMemSlicePitch = 0;
 
         hr = d3dDevice->CreateBuffer(
-            &bufferDesc,
-            &initialData,
+            &vertexBufferDesc,
+            &vertexInitialData,
             mVertexBuffer.GetAddressOf()
+        );
+
+        if (FAILED(hr))
+            return false;
+
+        D3D11_BUFFER_DESC constantBufferDesc {};
+        constantBufferDesc.ByteWidth = static_cast<UINT>(sizeof(FDebugViewConstants));
+        constantBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+        constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        constantBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        constantBufferDesc.MiscFlags = 0;
+        constantBufferDesc.StructureByteStride = 0;
+
+        hr = d3dDevice->CreateBuffer(
+            &constantBufferDesc,
+            nullptr,
+            mViewConstantBuffer.GetAddressOf()
         );
 
         if (FAILED(hr))
@@ -198,6 +219,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 
     void DebugRenderer::Shutdown()
     {
+        mViewConstantBuffer.Reset();
         mVertexBuffer.Reset();
         mInputLayout.Reset();
         mPixelShader.Reset();
@@ -206,7 +228,7 @@ float4 PSMain(PSInput input) : SV_TARGET
         mInitialized = false;
     }
 
-    void DebugRenderer::DrawDebugTriangle(DX11Device& device)
+    void DebugRenderer::DrawDebugTriangle(DX11Device& device, const FRenderViewInfo& viewInfo)
     {
         if (!mInitialized)
             return;
@@ -216,6 +238,29 @@ float4 PSMain(PSInput input) : SV_TARGET
         if (!context)
             return;
 
+        if (!mViewConstantBuffer)
+            return;
+
+        D3D11_MAPPED_SUBRESOURCE mappedResource {};
+
+        HRESULT hr = context->Map(
+            mViewConstantBuffer.Get(),
+            0,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &mappedResource
+        );
+
+        if (FAILED(hr))
+            return;
+
+        FDebugViewConstants* constants =
+            static_cast<FDebugViewConstants*>(mappedResource.pData);
+
+        constants->ViewProjectionMatrix = viewInfo.ViewProjectionMatrix;
+
+        context->Unmap(mViewConstantBuffer.Get(), 0);
+
         UINT stride = sizeof(FDebugVertex);
         UINT offset = 0;
 
@@ -224,11 +269,18 @@ float4 PSMain(PSInput input) : SV_TARGET
             mVertexBuffer.Get()
         };
 
+        ID3D11Buffer* constantBuffers[] =
+        {
+            mViewConstantBuffer.Get()
+        };
+
         context->IASetInputLayout(mInputLayout.Get());
         context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         context->IASetVertexBuffers(0, 1, vertexBuffers, &stride, &offset);
 
         context->VSSetShader(mVertexShader.Get(), nullptr, 0);
+        context->VSSetConstantBuffers(0, 1, constantBuffers);
+
         context->PSSetShader(mPixelShader.Get(), nullptr, 0);
 
         context->Draw(3, 0);
