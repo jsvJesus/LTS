@@ -1,6 +1,5 @@
 #include "World.h"
 
-#include "Scene.h"
 #include "Core/Logger.h"
 
 namespace World
