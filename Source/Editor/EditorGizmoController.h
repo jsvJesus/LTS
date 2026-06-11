@@ -108,10 +108,11 @@ namespace Editor
 
         [[nodiscard]] Core::Vector3 GetAxisDirection(EEditorGizmoAxis axis) const;
 
-        bool TryGetRayAxisValue(
+        bool TryGetRayAxisPlaneValue(
             const FEditorPickRay& ray,
             const Core::Vector3& axisOrigin,
             const Core::Vector3& axisDirection,
+            const Core::Vector3& referenceViewDirection,
             Core::f32& outValue
         ) const;
 

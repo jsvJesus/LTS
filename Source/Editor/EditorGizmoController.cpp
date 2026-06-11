@@ -365,10 +365,11 @@ namespace Editor
 
         Core::f32 axisValue = 0.0f;
 
-        if (!TryGetRayAxisValue(
+        if (!TryGetRayAxisPlaneValue(
             ray,
             mState.TargetTransform.Position,
             axisDirection,
+            ray.Direction,
             axisValue
         ))
         {
@@ -405,10 +406,11 @@ namespace Editor
 
         Core::f32 currentAxisValue = 0.0f;
 
-        if (!TryGetRayAxisValue(
+        if (!TryGetRayAxisPlaneValue(
             ray,
             mState.DragStartTransform.Position,
             axisDirection,
+            mState.DragStartRay.Direction,
             currentAxisValue
         ))
         {
@@ -708,10 +710,11 @@ namespace Editor
         }
     }
 
-    bool EditorGizmoController::TryGetRayAxisValue(
+    bool EditorGizmoController::TryGetRayAxisPlaneValue(
         const FEditorPickRay& ray,
         const Core::Vector3& axisOrigin,
         const Core::Vector3& axisDirection,
+        const Core::Vector3& referenceViewDirection,
         Core::f32& outValue
     ) const
     {
@@ -722,45 +725,54 @@ namespace Editor
 
         const Core::Vector3 rayDirection = ray.Direction.Normalized();
         const Core::Vector3 axis = axisDirection.Normalized();
+        const Core::Vector3 viewDirection = referenceViewDirection.Normalized();
 
         if (rayDirection.LengthSquared() <= 0.00001f ||
-            axis.LengthSquared() <= 0.00001f)
+            axis.LengthSquared() <= 0.00001f ||
+            viewDirection.LengthSquared() <= 0.00001f)
         {
             return false;
         }
 
-        const Core::Vector3 originToAxis = ray.Origin - axisOrigin;
+        Core::Vector3 side = Core::Vector3::Cross(viewDirection, axis);
 
-        const Core::f32 a = Core::Vector3::Dot(rayDirection, rayDirection);
-        const Core::f32 b = Core::Vector3::Dot(rayDirection, axis);
-        const Core::f32 c = Core::Vector3::Dot(axis, axis);
-        const Core::f32 d = Core::Vector3::Dot(rayDirection, originToAxis);
-        const Core::f32 e = Core::Vector3::Dot(axis, originToAxis);
-
-        const Core::f32 denominator = a * c - b * b;
-
-        Core::f32 rayDistance = 0.0f;
-        Core::f32 axisValue = 0.0f;
-
-        if (std::fabs(denominator) > 0.00001f)
+        if (side.LengthSquared() <= 0.00001f)
         {
-            rayDistance = (b * e - c * d) / denominator;
-            axisValue = (a * e - b * d) / denominator;
-        }
-        else
-        {
-            axisValue = e;
+            side = Core::Vector3::Cross(Core::Vector3::Up(), axis);
         }
 
-        if (rayDistance < 0.0f)
+        if (side.LengthSquared() <= 0.00001f)
         {
-            rayDistance = 0.0f;
-
-            const Core::Vector3 rayPoint = ray.Origin + rayDirection * rayDistance;
-            axisValue = Core::Vector3::Dot(rayPoint - axisOrigin, axis);
+            side = Core::Vector3::Cross(Core::Vector3::Right(), axis);
         }
 
-        outValue = axisValue;
+        if (side.LengthSquared() <= 0.00001f)
+            return false;
+
+        side.Normalize();
+
+        Core::Vector3 planeNormal = Core::Vector3::Cross(axis, side);
+
+        if (planeNormal.LengthSquared() <= 0.00001f)
+            return false;
+
+        planeNormal.Normalize();
+
+        const Core::f32 denominator =
+            Core::Vector3::Dot(rayDirection, planeNormal);
+
+        if (std::fabs(denominator) <= 0.00001f)
+            return false;
+
+        const Core::f32 distance =
+            Core::Vector3::Dot(axisOrigin - ray.Origin, planeNormal) / denominator;
+
+        if (distance < 0.0f)
+            return false;
+
+        const Core::Vector3 hitPoint = ray.Origin + rayDirection * distance;
+
+        outValue = Core::Vector3::Dot(hitPoint - axisOrigin, axis);
         return true;
     }
 
