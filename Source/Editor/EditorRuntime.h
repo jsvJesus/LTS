@@ -6,6 +6,7 @@
 
 #include "EditorViewportController.h"
 #include "EditorToolModeController.h"
+#include "EditorSelectionController.h"
 
 namespace Editor
 {
@@ -33,6 +34,7 @@ namespace Editor
 
         std::unique_ptr<EditorViewportController> mViewportController;
         std::unique_ptr<EditorToolModeController> mToolModeController;
+        std::unique_ptr<EditorSelectionController> mSelectionController;
 
         bool mInitialized = false;
     };

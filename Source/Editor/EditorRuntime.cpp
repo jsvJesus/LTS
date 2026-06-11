@@ -2,6 +2,7 @@
 
 #include "EditorViewportController.h"
 #include "EditorToolModeController.h"
+#include "EditorSelectionController.h"
 
 namespace Editor
 {
@@ -59,12 +60,39 @@ namespace Editor
             return false;
         }
 
+        mSelectionController = std::make_unique<EditorSelectionController>();
+
+        FEditorSelectionControllerDesc selectionDesc {};
+        selectionDesc.EnableDebugMarker = true;
+        selectionDesc.MarkerDistance = 4.25f;
+        selectionDesc.MarkerSize = 0.45f;
+
+        if (!mSelectionController->Initialize(mContext, selectionDesc))
+        {
+            mSelectionController.reset();
+
+            mToolModeController->Shutdown();
+            mToolModeController.reset();
+
+            mViewportController->Shutdown();
+            mViewportController.reset();
+
+            mInitialized = false;
+            return false;
+        }
+
         mInitialized = true;
         return true;
     }
 
     void LevelEditorRuntime::Shutdown()
     {
+        if (mSelectionController)
+        {
+            mSelectionController->Shutdown();
+            mSelectionController.reset();
+        }
+
         if (mToolModeController)
         {
             mToolModeController->Shutdown();
@@ -91,13 +119,18 @@ namespace Editor
             mViewportController->Tick(deltaSeconds);
         }
 
+        if (mSelectionController)
+        {
+            mSelectionController->Tick(deltaSeconds);
+        }
+
         if (mToolModeController)
         {
             mToolModeController->Tick(deltaSeconds);
         }
 
         // Позже тут будут:
-        // selection tick
+        // selection picking
         // gizmo tick
         // editor tools tick
     }
@@ -110,6 +143,11 @@ namespace Editor
         if (mViewportController)
         {
             mViewportController->RenderDebug();
+        }
+
+        if (mSelectionController)
+        {
+            mSelectionController->RenderDebug();
         }
 
         if (mToolModeController)
