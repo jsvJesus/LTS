@@ -24,6 +24,7 @@ namespace Render
 namespace Engine
 {
     class Camera;
+    class CameraController;
 
     class EngineLoop final
     {
@@ -64,6 +65,7 @@ namespace Engine
         void UpdateCameraAspectRatio();
         void ToggleCameraControl();
         Core::String BuildCameraDebugLogLine() const;
+        Core::String BuildCameraControllerDebugLogLine() const;
 
         void QueueDefaultDebugDraw();
 
@@ -89,6 +91,7 @@ namespace Engine
         std::unique_ptr<Platform::InputSystem> mInputSystem;
         std::unique_ptr<Render::RenderSystem> mRenderSystem;
         std::unique_ptr<Camera> mCamera;
+        std::unique_ptr<CameraController> mCameraController;
 
         std::chrono::steady_clock::time_point mLastFrameTime {};
     };

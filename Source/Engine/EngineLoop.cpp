@@ -1,6 +1,7 @@
 #include "EngineLoop.h"
 
 #include "Camera/Camera.h"
+#include "Camera/CameraController.h"
 
 #include "../Core/Logger.h"
 #include "../Platform/Input.h"
@@ -260,6 +261,7 @@ namespace Engine
         LogFrameLimiterState();
         Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
         Core::Logger::Info("Camera", BuildCameraDebugLogLine());
+        Core::Logger::Info("Camera", BuildCameraControllerDebugLogLine());
 
         return true;
     }
@@ -315,6 +317,11 @@ namespace Engine
     {
         mRunning = false;
 
+        if (mCameraController)
+        {
+            mCameraController.reset();
+        }
+
         if (mCamera)
         {
             mCamera.reset();
@@ -365,6 +372,7 @@ namespace Engine
             Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
             Core::Logger::Info("Input", BuildInputDebugLogLine());
             Core::Logger::Info("Camera", BuildCameraDebugLogLine());
+            Core::Logger::Info("Camera", BuildCameraControllerDebugLogLine());
         }
 
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F3))
@@ -626,8 +634,11 @@ namespace Engine
     void EngineLoop::InitializeCamera(const std::uint32_t width, const std::uint32_t height)
     {
         mCamera = std::make_unique<Camera>();
+        mCameraController = std::make_unique<CameraController>();
 
         FCameraDesc cameraDesc {};
+        FCameraControllerDesc controllerDesc {};
+
         cameraDesc.AspectRatio = height > 0
             ? static_cast<Core::f32>(width) / static_cast<Core::f32>(height)
             : 16.0f / 9.0f;
@@ -639,6 +650,12 @@ namespace Engine
             cameraDesc.FieldOfViewYDegrees = 70.0f;
             cameraDesc.MoveSpeed = 15.0f;
             cameraDesc.MouseSensitivity = 0.06f;
+
+            controllerDesc.MoveSpeed = 15.0f;
+            controllerDesc.MouseSensitivity = 0.06f;
+            controllerDesc.SpeedBoostMultiplier = 4.0f;
+            controllerDesc.RequireCursorLockForRotation = true;
+            controllerDesc.EnableSpeedBoost = true;
         }
         else
         {
@@ -647,19 +664,26 @@ namespace Engine
             cameraDesc.FieldOfViewYDegrees = 75.0f;
             cameraDesc.MoveSpeed = 7.5f;
             cameraDesc.MouseSensitivity = 0.08f;
+
+            controllerDesc.MoveSpeed = 7.5f;
+            controllerDesc.MouseSensitivity = 0.08f;
+            controllerDesc.SpeedBoostMultiplier = 2.0f;
+            controllerDesc.RequireCursorLockForRotation = true;
+            controllerDesc.EnableSpeedBoost = true;
         }
 
         mCamera->Initialize(cameraDesc);
+        mCameraController->Initialize(controllerDesc);
 
         mCameraControlEnabled = true;
     }
 
     void EngineLoop::UpdateCamera(const double deltaSeconds)
     {
-        if (!mCamera || !mInputSystem || !mCameraControlEnabled)
+        if (!mCamera || !mCameraController || !mInputSystem || !mCameraControlEnabled)
             return;
 
-        mCamera->UpdateFromInput(*mInputSystem, deltaSeconds);
+        mCameraController->Update(*mCamera, *mInputSystem, deltaSeconds);
     }
 
     void EngineLoop::UpdateCameraAspectRatio()
@@ -742,6 +766,41 @@ namespace Engine
                << std::fixed
                << std::setprecision(3)
                << mCamera->GetAspectRatio();
+
+        return stream.str();
+    }
+
+    Core::String EngineLoop::BuildCameraControllerDebugLogLine() const
+    {
+        std::ostringstream stream;
+
+        if (!mCameraController)
+        {
+            stream << "CameraController: not available";
+            return stream.str();
+        }
+
+        stream << "CameraController: "
+               << "Movement="
+               << (mCameraController->IsMovementEnabled() ? "enabled" : "disabled")
+               << ", Rotation="
+               << (mCameraController->IsRotationEnabled() ? "enabled" : "disabled")
+               << ", RequireCursorLockForRotation="
+               << (mCameraController->IsCursorLockRequiredForRotation() ? "true" : "false")
+               << ", SpeedBoost="
+               << (mCameraController->IsSpeedBoostEnabled() ? "enabled" : "disabled")
+               << ", MoveSpeed="
+               << std::fixed
+               << std::setprecision(2)
+               << mCameraController->GetMoveSpeed()
+               << ", BoostMultiplier="
+               << std::fixed
+               << std::setprecision(2)
+               << mCameraController->GetSpeedBoostMultiplier()
+               << ", MouseSensitivity="
+               << std::fixed
+               << std::setprecision(3)
+               << mCameraController->GetMouseSensitivity();
 
         return stream.str();
     }
