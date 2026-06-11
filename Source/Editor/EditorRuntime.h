@@ -5,6 +5,7 @@
 #include "Engine/ApplicationRuntime.h"
 
 #include "EditorViewportController.h"
+#include "EditorWorldController.h"
 #include "EditorToolModeController.h"
 #include "EditorSelectionController.h"
 #include "EditorPickingController.h"
@@ -34,6 +35,7 @@ namespace Editor
         Engine::FApplicationRuntimeContext mContext {};
 
         std::unique_ptr<EditorViewportController> mViewportController;
+        std::unique_ptr<EditorWorldController> mWorldController;
         std::unique_ptr<EditorToolModeController> mToolModeController;
         std::unique_ptr<EditorSelectionController> mSelectionController;
         std::unique_ptr<EditorPickingController> mPickingController;

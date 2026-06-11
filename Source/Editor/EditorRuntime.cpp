@@ -1,6 +1,7 @@
 #include "EditorRuntime.h"
 
 #include "EditorViewportController.h"
+#include "EditorWorldController.h"
 #include "EditorToolModeController.h"
 #include "EditorSelectionController.h"
 #include "EditorPickingController.h"
@@ -42,6 +43,25 @@ namespace Editor
             return false;
         }
 
+        mWorldController = std::make_unique<EditorWorldController>();
+
+        FEditorWorldControllerDesc worldDesc {};
+        worldDesc.CreateDefaultScene = true;
+        worldDesc.EnableDebugDraw = true;
+        worldDesc.DebugBoxHalfExtent = 0.35f;
+        worldDesc.DebugAxisLength = 0.85f;
+
+        if (!mWorldController->Initialize(mContext, worldDesc))
+        {
+            mWorldController.reset();
+
+            mViewportController->Shutdown();
+            mViewportController.reset();
+
+            mInitialized = false;
+            return false;
+        }
+
         mSelectionController = std::make_unique<EditorSelectionController>();
 
         FEditorSelectionControllerDesc selectionDesc {};
@@ -52,6 +72,9 @@ namespace Editor
         if (!mSelectionController->Initialize(mContext, selectionDesc))
         {
             mSelectionController.reset();
+
+            mWorldController->Shutdown();
+            mWorldController.reset();
 
             mViewportController->Shutdown();
             mViewportController.reset();
@@ -73,6 +96,9 @@ namespace Editor
 
             mSelectionController->Shutdown();
             mSelectionController.reset();
+
+            mWorldController->Shutdown();
+            mWorldController.reset();
 
             mViewportController->Shutdown();
             mViewportController.reset();
@@ -98,6 +124,9 @@ namespace Editor
 
             mSelectionController->Shutdown();
             mSelectionController.reset();
+
+            mWorldController->Shutdown();
+            mWorldController.reset();
 
             mViewportController->Shutdown();
             mViewportController.reset();
@@ -130,6 +159,12 @@ namespace Editor
             mSelectionController.reset();
         }
 
+        if (mWorldController)
+        {
+            mWorldController->Shutdown();
+            mWorldController.reset();
+        }
+
         if (mViewportController)
         {
             mViewportController->Shutdown();
@@ -148,6 +183,11 @@ namespace Editor
         if (mViewportController)
         {
             mViewportController->Tick(deltaSeconds);
+        }
+
+        if (mWorldController)
+        {
+            mWorldController->Tick(deltaSeconds);
         }
 
         if (mPickingController)
@@ -180,6 +220,11 @@ namespace Editor
         if (mViewportController)
         {
             mViewportController->RenderDebug();
+        }
+
+        if (mWorldController)
+        {
+            mWorldController->RenderDebug();
         }
 
         if (mPickingController)
