@@ -43,6 +43,8 @@ namespace Editor
         [[nodiscard]] bool HasLastPickRequest() const { return mLastPickRequest.IsValid(); }
         [[nodiscard]] const FEditorPickRequest& GetLastPickRequest() const { return mLastPickRequest; }
 
+        bool BuildCurrentPickRay(FEditorPickRay& outRay) const;
+
     private:
         void HandleInput();
 

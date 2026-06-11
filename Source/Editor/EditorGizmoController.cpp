@@ -259,12 +259,18 @@ namespace Editor
         if (mState.ToolMode == toolMode)
             return;
 
+        if (mState.IsDragging())
+        {
+            EndDrag();
+        }
+
         mState.ToolMode = toolMode;
 
         if (toolMode == EEditorToolMode::Select)
         {
             mState.ActiveAxis = EEditorGizmoAxis::None;
             mState.DragState = EEditorGizmoDragState::Idle;
+            mState.HasValidDragStart = false;
         }
     }
 
@@ -277,6 +283,11 @@ namespace Editor
         {
             ClearTarget();
             return;
+        }
+
+        if (mState.IsDragging() && mState.TargetEntityId != entityId)
+        {
+            EndDrag();
         }
 
         mState.TargetEntityId = entityId;
@@ -293,6 +304,9 @@ namespace Editor
         mState.DragState = EEditorGizmoDragState::Idle;
         mState.DragStartRay = FEditorPickRay {};
         mState.LastRay = FEditorPickRay {};
+        mState.DragStartTransform = World::FTransform {};
+        mState.DragStartAxisValue = 0.0f;
+        mState.HasValidDragStart = false;
     }
 
     bool EditorGizmoController::TryHitAxis(
@@ -339,10 +353,36 @@ namespace Editor
         if (!mState.CanDrawGizmo() || !ray.IsValid() || axis == EEditorGizmoAxis::None)
             return;
 
+        // Этот этап Roadmap делает только Move preview.
+        // Rotate/Scale будут отдельными следующими этапами.
+        if (mState.ToolMode != EEditorToolMode::Move)
+            return;
+
+        const Core::Vector3 axisDirection = GetAxisDirection(axis);
+
+        if (axisDirection.LengthSquared() <= 0.00001f)
+            return;
+
+        Core::f32 axisValue = 0.0f;
+
+        if (!TryGetRayAxisValue(
+            ray,
+            mState.TargetTransform.Position,
+            axisDirection,
+            axisValue
+        ))
+        {
+            return;
+        }
+
         mState.ActiveAxis = axis;
         mState.DragState = EEditorGizmoDragState::Dragging;
         mState.DragStartRay = ray;
         mState.LastRay = ray;
+
+        mState.DragStartTransform = mState.TargetTransform;
+        mState.DragStartAxisValue = axisValue;
+        mState.HasValidDragStart = true;
     }
 
     void EditorGizmoController::UpdateDrag(const FEditorPickRay& ray)
@@ -351,6 +391,35 @@ namespace Editor
             return;
 
         mState.LastRay = ray;
+
+        if (mState.ToolMode != EEditorToolMode::Move)
+            return;
+
+        if (!mState.HasValidDragStart)
+            return;
+
+        const Core::Vector3 axisDirection = GetAxisDirection(mState.ActiveAxis);
+
+        if (axisDirection.LengthSquared() <= 0.00001f)
+            return;
+
+        Core::f32 currentAxisValue = 0.0f;
+
+        if (!TryGetRayAxisValue(
+            ray,
+            mState.DragStartTransform.Position,
+            axisDirection,
+            currentAxisValue
+        ))
+        {
+            return;
+        }
+
+        const Core::f32 delta = currentAxisValue - mState.DragStartAxisValue;
+
+        mState.TargetTransform = mState.DragStartTransform;
+        mState.TargetTransform.Position =
+            mState.DragStartTransform.Position + axisDirection * delta;
     }
 
     void EditorGizmoController::EndDrag()
@@ -362,6 +431,9 @@ namespace Editor
         mState.DragState = EEditorGizmoDragState::Idle;
         mState.DragStartRay = FEditorPickRay {};
         mState.LastRay = FEditorPickRay {};
+        mState.DragStartTransform = World::FTransform {};
+        mState.DragStartAxisValue = 0.0f;
+        mState.HasValidDragStart = false;
     }
 
     bool EditorGizmoController::TryHitMoveGizmoAxis(
@@ -613,6 +685,82 @@ namespace Editor
         outResult.Distance = distance;
         outResult.HitPosition = hitPosition;
 
+        return true;
+    }
+
+    Core::Vector3 EditorGizmoController::GetAxisDirection(const EEditorGizmoAxis axis) const
+    {
+        switch (axis)
+        {
+        case EEditorGizmoAxis::X:
+            return Core::Vector3::Right();
+
+        case EEditorGizmoAxis::Y:
+            return Core::Vector3::Up();
+
+        case EEditorGizmoAxis::Z:
+            return Core::Vector3::Forward();
+
+        case EEditorGizmoAxis::Uniform:
+        case EEditorGizmoAxis::None:
+        default:
+            return Core::Vector3::Zero();
+        }
+    }
+
+    bool EditorGizmoController::TryGetRayAxisValue(
+        const FEditorPickRay& ray,
+        const Core::Vector3& axisOrigin,
+        const Core::Vector3& axisDirection,
+        Core::f32& outValue
+    ) const
+    {
+        outValue = 0.0f;
+
+        if (!ray.IsValid())
+            return false;
+
+        const Core::Vector3 rayDirection = ray.Direction.Normalized();
+        const Core::Vector3 axis = axisDirection.Normalized();
+
+        if (rayDirection.LengthSquared() <= 0.00001f ||
+            axis.LengthSquared() <= 0.00001f)
+        {
+            return false;
+        }
+
+        const Core::Vector3 originToAxis = ray.Origin - axisOrigin;
+
+        const Core::f32 a = Core::Vector3::Dot(rayDirection, rayDirection);
+        const Core::f32 b = Core::Vector3::Dot(rayDirection, axis);
+        const Core::f32 c = Core::Vector3::Dot(axis, axis);
+        const Core::f32 d = Core::Vector3::Dot(rayDirection, originToAxis);
+        const Core::f32 e = Core::Vector3::Dot(axis, originToAxis);
+
+        const Core::f32 denominator = a * c - b * b;
+
+        Core::f32 rayDistance = 0.0f;
+        Core::f32 axisValue = 0.0f;
+
+        if (std::fabs(denominator) > 0.00001f)
+        {
+            rayDistance = (b * e - c * d) / denominator;
+            axisValue = (a * e - b * d) / denominator;
+        }
+        else
+        {
+            axisValue = e;
+        }
+
+        if (rayDistance < 0.0f)
+        {
+            rayDistance = 0.0f;
+
+            const Core::Vector3 rayPoint = ray.Origin + rayDirection * rayDistance;
+            axisValue = Core::Vector3::Dot(rayPoint - axisOrigin, axis);
+        }
+
+        outValue = axisValue;
         return true;
     }
 

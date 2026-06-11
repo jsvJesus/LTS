@@ -61,6 +61,9 @@ namespace Editor
 
         [[nodiscard]] bool IsInitialized() const { return mInitialized; }
         [[nodiscard]] const FEditorGizmoState& GetState() const { return mState; }
+        [[nodiscard]] bool IsDragging() const { return mState.IsDragging(); }
+        [[nodiscard]] World::EntityId GetTargetEntityId() const { return mState.TargetEntityId; }
+        [[nodiscard]] const World::FTransform& GetTargetTransform() const { return mState.TargetTransform; }
 
     private:
         bool TryHitMoveGizmoAxis(
@@ -101,6 +104,15 @@ namespace Editor
             Core::f32 distance,
             const Core::Vector3& hitPosition,
             FEditorGizmoAxisHitResult& outResult
+        ) const;
+
+        [[nodiscard]] Core::Vector3 GetAxisDirection(EEditorGizmoAxis axis) const;
+
+        bool TryGetRayAxisValue(
+            const FEditorPickRay& ray,
+            const Core::Vector3& axisOrigin,
+            const Core::Vector3& axisDirection,
+            Core::f32& outValue
         ) const;
 
         void DrawGizmo();

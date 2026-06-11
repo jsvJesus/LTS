@@ -78,6 +78,11 @@ namespace Editor
             World::FTransform& outTransform
         ) const;
 
+        bool SetEntityTransform(
+            World::EntityId entityId,
+            const World::FTransform& transform
+        );
+
         [[nodiscard]] World::EntityId GetSelectedEntityId() const { return mSelectedEntityId; }
 
     private:

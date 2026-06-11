@@ -36,6 +36,9 @@ namespace Editor
         bool RoutePickingToGizmo();
         void RoutePickingToSelection();
 
+        void UpdateGizmoDrag();
+        void ApplyGizmoPreviewTransform();
+
         void SyncWorldSelectionDebug();
         void SyncGizmoState();
 

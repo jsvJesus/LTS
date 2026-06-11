@@ -52,6 +52,10 @@ namespace Editor
         FEditorPickRay DragStartRay {};
         FEditorPickRay LastRay {};
 
+        World::FTransform DragStartTransform {};
+        Core::f32 DragStartAxisValue = 0.0f;
+
+        bool HasValidDragStart = false;
         bool HasTarget = false;
 
         [[nodiscard]] bool CanDrawGizmo() const

@@ -9,6 +9,8 @@
 
 #include "World/EntityId.h"
 
+#include "Platform/Input.h"
+
 namespace Editor
 {
     LevelEditorRuntime::LevelEditorRuntime() = default;
@@ -244,7 +246,10 @@ namespace Editor
 
         const bool gizmoCapturedPick = RoutePickingToGizmo();
 
-        if (!gizmoCapturedPick)
+        const bool gizmoIsDragging =
+            mGizmoController && mGizmoController->IsDragging();
+
+        if (!gizmoCapturedPick && !gizmoIsDragging)
         {
             RoutePickingToSelection();
         }
@@ -262,6 +267,7 @@ namespace Editor
         }
 
         SyncGizmoState();
+        UpdateGizmoDrag();
 
         if (mGizmoController)
         {
@@ -372,6 +378,46 @@ namespace Editor
 
         mSelectionController->ClearSelection();
         mWorldController->ClearSelectedEntityId();
+    }
+
+    void LevelEditorRuntime::UpdateGizmoDrag()
+    {
+        if (!mGizmoController || !mPickingController || !mContext.InputSystem)
+            return;
+
+        if (!mGizmoController->IsDragging())
+            return;
+
+        if (!mContext.InputSystem->IsMouseButtonDown(Platform::MouseButton::Left))
+            return;
+
+        FEditorPickRay currentRay {};
+
+        if (!mPickingController->BuildCurrentPickRay(currentRay))
+            return;
+
+        mGizmoController->UpdateDrag(currentRay);
+
+        ApplyGizmoPreviewTransform();
+    }
+
+    void LevelEditorRuntime::ApplyGizmoPreviewTransform()
+    {
+        if (!mGizmoController || !mWorldController)
+            return;
+
+        if (!mGizmoController->IsDragging())
+            return;
+
+        const World::EntityId targetEntityId = mGizmoController->GetTargetEntityId();
+
+        if (!World::IsValidEntityId(targetEntityId))
+            return;
+
+        mWorldController->SetEntityTransform(
+            targetEntityId,
+            mGizmoController->GetTargetTransform()
+        );
     }
 
     void LevelEditorRuntime::SyncWorldSelectionDebug()

@@ -249,6 +249,28 @@ namespace Editor
         return true;
     }
 
+    bool EditorWorldController::SetEntityTransform(
+        const World::EntityId entityId,
+        const World::FTransform& transform
+    )
+    {
+        if (!mInitialized || !World::IsValidEntityId(entityId))
+            return false;
+
+        World::Scene* scene = mWorld.GetActiveScene();
+
+        if (!scene)
+            return false;
+
+        World::FEntity* entity = scene->FindEntity(entityId);
+
+        if (!entity || !entity->IsValid())
+            return false;
+
+        entity->Transform = transform;
+        return true;
+    }
+
     bool EditorWorldController::CreateDefaultEditorScene()
     {
         World::Scene* scene = mWorld.CreateEmptyScene("EditorPreviewScene");

@@ -10,6 +10,7 @@
 #include "Core/Logger.h"
 
 #include <sstream>
+#include <cmath>
 
 namespace Editor
 {
@@ -133,6 +134,16 @@ namespace Editor
         mLogPickRequests = enabled;
     }
 
+    bool EditorPickingController::BuildCurrentPickRay(FEditorPickRay& outRay) const
+    {
+        outRay = FEditorPickRay {};
+
+        if (!mInitialized)
+            return false;
+
+        return BuildPickRay(outRay);
+    }
+
     void EditorPickingController::HandleInput()
     {
         if (!mContext.InputSystem)
@@ -193,17 +204,52 @@ namespace Editor
 
     bool EditorPickingController::BuildPickRay(FEditorPickRay& outRay) const
     {
-        if (!mContext.MainCamera)
+        outRay = FEditorPickRay {};
+
+        if (!mContext.MainCamera || !mContext.InputSystem || !mContext.RenderSystem)
             return false;
 
-        Core::Vector3 direction = mContext.MainCamera->GetForwardVector().Normalized();
+        const Core::u32 viewportWidth =
+            static_cast<Core::u32>(mContext.RenderSystem->GetWidth());
+
+        const Core::u32 viewportHeight =
+            static_cast<Core::u32>(mContext.RenderSystem->GetHeight());
+
+        if (viewportWidth == 0 || viewportHeight == 0)
+            return false;
+
+        const Core::f32 normalizedX = BuildNormalizedMouseCoordinateX(
+            mContext.InputSystem->GetMouseX(),
+            viewportWidth
+        );
+
+        const Core::f32 normalizedY = BuildNormalizedMouseCoordinateY(
+            mContext.InputSystem->GetMouseY(),
+            viewportHeight
+        );
+
+        const Core::f32 fieldOfViewRadians =
+            Core::ToRadians(mContext.MainCamera->GetFieldOfViewYDegrees());
+
+        const Core::f32 tanHalfFov =
+            static_cast<Core::f32>(std::tan(fieldOfViewRadians * 0.5f));
+
+        const Core::f32 aspectRatio = mContext.MainCamera->GetAspectRatio();
+
+        const Core::Vector3 forward = mContext.MainCamera->GetForwardVector().Normalized();
+        const Core::Vector3 right = mContext.MainCamera->GetRightVector().Normalized();
+        const Core::Vector3 up = mContext.MainCamera->GetUpVector().Normalized();
+
+        Core::Vector3 direction =
+            forward +
+            right * (normalizedX * aspectRatio * tanHalfFov) +
+            up * (normalizedY * tanHalfFov);
+
+        direction.Normalize();
 
         if (direction.LengthSquared() <= 0.00001f)
-        {
-            direction = Core::Vector3::Forward();
-        }
+            return false;
 
-        outRay = FEditorPickRay {};
         outRay.Origin = mContext.MainCamera->GetPosition();
         outRay.Direction = direction;
 
