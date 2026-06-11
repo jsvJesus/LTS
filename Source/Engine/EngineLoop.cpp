@@ -95,6 +95,7 @@ namespace Engine
 
         Core::String BuildDebugTitle(
             const Core::String& baseTitle,
+            const Core::StringView applicationModeName,
             const Core::i32 width,
             const Core::i32 height,
             const FFrameStatsSnapshot& stats,
@@ -107,6 +108,8 @@ namespace Engine
             std::ostringstream stream;
 
             stream << baseTitle
+                   << " | Mode: "
+                   << applicationModeName
                    << " | "
                    << Core::GetBuildConfigurationName()
                    << " | "
@@ -183,6 +186,7 @@ namespace Engine
     bool EngineLoop::Initialize(const FApplicationDesc& desc)
     {
         Shutdown();
+        mApplicationMode = desc.ApplicationMode;
 
         mBaseWindowTitle = WideToUtf8(desc.Title);
         mEnableFrameStatsTitle = desc.EnableFrameStatsTitle;
@@ -252,6 +256,7 @@ namespace Engine
         UpdateWindowDebugTitle();
 
         Core::Logger::Info("Engine", "Engine loop initialized.");
+        Core::Logger::Info("Engine", BuildApplicationModeLogLine());
         LogFrameLimiterState();
         Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
         Core::Logger::Info("Camera", BuildCameraDebugLogLine());
@@ -337,6 +342,7 @@ namespace Engine
         mFrameLimiter.Reset();
 
         mBaseWindowTitle.clear();
+        mApplicationMode = EApplicationMode::Unknown;
 
         mCameraControlEnabled = true;
 
@@ -354,6 +360,7 @@ namespace Engine
         if (mInputSystem && mInputSystem->IsKeyPressed(Platform::KeyCode::F2))
         {
             Core::Logger::Info("Engine", BuildFrameStatsLogLine(mFrameStats.GetSnapshot()));
+            Core::Logger::Info("Engine", BuildApplicationModeLogLine());
             Core::Logger::Info("Engine", BuildFrameLimiterLogLine());
             Core::Logger::Info("Engine", BuildDebugRenderingLogLine());
             Core::Logger::Info("Input", BuildInputDebugLogLine());
@@ -419,33 +426,7 @@ namespace Engine
 
         mRenderSystem->BeginFrame(frameInfo);
 
-        Render::FRenderColor gridColor {};
-        gridColor.R = 0.22f;
-        gridColor.G = 0.22f;
-        gridColor.B = 0.22f;
-        gridColor.A = 1.0f;
-
-        Render::FRenderColor gridCenterColor {};
-        gridCenterColor.R = 0.38f;
-        gridCenterColor.G = 0.38f;
-        gridCenterColor.B = 0.38f;
-        gridCenterColor.A = 1.0f;
-
-        Render::FRenderColor triangleColor {};
-        triangleColor.R = 1.00f;
-        triangleColor.G = 0.85f;
-        triangleColor.B = 0.20f;
-        triangleColor.A = 1.0f;
-
-        mRenderSystem->DrawDebugGrid(10, 1.0f, gridColor, gridCenterColor);
-        mRenderSystem->DrawDebugAxes(3.0f);
-
-        mRenderSystem->DrawDebugWireTriangle(
-            Core::Vector3( 0.0f, 2.35f, 4.0f),
-            Core::Vector3( 1.0f, 1.00f, 4.0f),
-            Core::Vector3(-1.0f, 1.00f, 4.0f),
-            triangleColor
-        );
+        QueueDefaultDebugDraw();
 
         mRenderSystem->RenderDebug();
 
@@ -504,6 +485,7 @@ namespace Engine
 
         const Core::String title = BuildDebugTitle(
             mBaseWindowTitle,
+            GetApplicationModeName(mApplicationMode),
             mWindow->GetWidth(),
             mWindow->GetHeight(),
             mFrameStats.GetSnapshot(),
@@ -514,6 +496,21 @@ namespace Engine
         );
 
         mWindow->SetTitle(title);
+    }
+
+    bool EngineLoop::IsEditorRuntimeMode() const
+    {
+        return mApplicationMode == EApplicationMode::LevelEditor;
+    }
+
+    Core::String EngineLoop::BuildApplicationModeLogLine() const
+    {
+        std::ostringstream stream;
+
+        stream << "ApplicationMode: "
+               << GetApplicationModeName(mApplicationMode);
+
+        return stream.str();
     }
 
     void EngineLoop::LogFrameLimiterState() const
@@ -635,6 +632,23 @@ namespace Engine
             ? static_cast<Core::f32>(width) / static_cast<Core::f32>(height)
             : 16.0f / 9.0f;
 
+        if (IsEditorRuntimeMode())
+        {
+            cameraDesc.Position = Core::Vector3(0.0f, 4.0f, -8.0f);
+            cameraDesc.Rotation = Core::Rotator(-20.0f, 0.0f, 0.0f);
+            cameraDesc.FieldOfViewYDegrees = 70.0f;
+            cameraDesc.MoveSpeed = 15.0f;
+            cameraDesc.MouseSensitivity = 0.06f;
+        }
+        else
+        {
+            cameraDesc.Position = Core::Vector3(0.0f, 1.6f, -5.0f);
+            cameraDesc.Rotation = Core::Rotator::Zero();
+            cameraDesc.FieldOfViewYDegrees = 75.0f;
+            cameraDesc.MoveSpeed = 7.5f;
+            cameraDesc.MouseSensitivity = 0.08f;
+        }
+
         mCamera->Initialize(cameraDesc);
 
         mCameraControlEnabled = true;
@@ -730,5 +744,46 @@ namespace Engine
                << mCamera->GetAspectRatio();
 
         return stream.str();
+    }
+
+    void EngineLoop::QueueDefaultDebugDraw()
+    {
+        if (!mRenderSystem)
+            return;
+
+        Render::FRenderColor gridColor {};
+        gridColor.R = 0.22f;
+        gridColor.G = 0.22f;
+        gridColor.B = 0.22f;
+        gridColor.A = 1.0f;
+
+        Render::FRenderColor gridCenterColor {};
+        gridCenterColor.R = 0.38f;
+        gridCenterColor.G = 0.38f;
+        gridCenterColor.B = 0.38f;
+        gridCenterColor.A = 1.0f;
+
+        Render::FRenderColor triangleColor {};
+        triangleColor.R = 1.00f;
+        triangleColor.G = 0.85f;
+        triangleColor.B = 0.20f;
+        triangleColor.A = 1.0f;
+
+        if (IsEditorRuntimeMode())
+        {
+            mRenderSystem->DrawDebugGrid(20, 1.0f, gridColor, gridCenterColor);
+            mRenderSystem->DrawDebugAxes(5.0f);
+        }
+        else
+        {
+            mRenderSystem->DrawDebugAxes(3.0f);
+        }
+
+        mRenderSystem->DrawDebugWireTriangle(
+            Core::Vector3( 0.0f, 2.35f, 4.0f),
+            Core::Vector3( 1.0f, 1.00f, 4.0f),
+            Core::Vector3(-1.0f, 1.00f, 4.0f),
+            triangleColor
+        );
     }
 }

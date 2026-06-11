@@ -6,6 +6,8 @@ int main(int argc, char* argv[])
     (void)argv;
 
     Engine::FApplicationDesc appDesc {};
+    appDesc.ApplicationMode = Engine::EApplicationMode::LevelEditor;
+
     appDesc.ApplicationName = "LevelEditor";
     appDesc.LogDirectory = "Logs/LevelEditor";
 

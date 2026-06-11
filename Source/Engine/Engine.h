@@ -4,6 +4,16 @@
 
 namespace Engine
 {
+    enum class EApplicationMode : std::uint8_t
+    {
+        Unknown = 0,
+        GameClient,
+        LevelEditor,
+        Tool
+    };
+
+    const char* GetApplicationModeName(EApplicationMode mode);
+
     struct FApplicationColor final
     {
         float R = 0.015f;
@@ -14,6 +24,8 @@ namespace Engine
 
     struct FApplicationDesc
     {
+        EApplicationMode ApplicationMode = EApplicationMode::Unknown;
+
         const char* ApplicationName = "Application";
         const char* LogDirectory = "Logs/Application";
 

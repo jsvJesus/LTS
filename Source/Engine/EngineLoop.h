@@ -46,8 +46,12 @@ namespace Engine
         void UpdateFrameStats(double deltaSeconds);
         void UpdateWindowDebugTitle();
 
+        [[nodiscard]] bool IsEditorRuntimeMode() const;
+
         void LogFrameLimiterState() const;
         Core::String BuildFrameLimiterLogLine() const;
+
+        Core::String BuildApplicationModeLogLine() const;
 
         void ToggleDebugRendering();
         Core::String BuildDebugRenderingLogLine() const;
@@ -61,9 +65,13 @@ namespace Engine
         void ToggleCameraControl();
         Core::String BuildCameraDebugLogLine() const;
 
+        void QueueDefaultDebugDraw();
+
     private:
         bool mInitialized = false;
         bool mRunning = false;
+
+        EApplicationMode mApplicationMode = EApplicationMode::Unknown;
 
         bool mEnableFrameStatsTitle = true;
         double mFrameStatsTitleUpdateIntervalSeconds = 0.5;

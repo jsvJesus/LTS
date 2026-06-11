@@ -48,11 +48,31 @@ namespace Engine
         }
     }
 
+    const char* GetApplicationModeName(const EApplicationMode mode)
+    {
+        switch (mode)
+        {
+        case EApplicationMode::GameClient:
+            return "GameClient";
+
+        case EApplicationMode::LevelEditor:
+            return "LevelEditor";
+
+        case EApplicationMode::Tool:
+            return "Tool";
+
+        case EApplicationMode::Unknown:
+        default:
+            return "Unknown";
+        }
+    }
+
     int RunWindowApplication(const FApplicationDesc& desc)
     {
         const bool loggerInitialized = InitializeLogger(desc);
 
         Core::Logger::Info("Engine", "Starting window application.");
+        Core::Logger::Info("Engine", GetApplicationModeName(desc.ApplicationMode));
 
         EngineLoop loop;
 
@@ -86,6 +106,7 @@ namespace Engine
     )
     {
         FApplicationDesc desc {};
+        desc.ApplicationMode = EApplicationMode::Unknown;
         desc.ApplicationName = "Application";
         desc.LogDirectory = "Logs/Application";
         desc.Title = title;
