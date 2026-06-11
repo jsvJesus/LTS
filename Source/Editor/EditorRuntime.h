@@ -5,6 +5,7 @@
 #include "Engine/ApplicationRuntime.h"
 
 #include "EditorViewportController.h"
+#include "EditorToolModeController.h"
 
 namespace Editor
 {
@@ -31,6 +32,7 @@ namespace Editor
         Engine::FApplicationRuntimeContext mContext {};
 
         std::unique_ptr<EditorViewportController> mViewportController;
+        std::unique_ptr<EditorToolModeController> mToolModeController;
 
         bool mInitialized = false;
     };

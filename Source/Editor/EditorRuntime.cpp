@@ -1,12 +1,13 @@
 #include "EditorRuntime.h"
 
 #include "EditorViewportController.h"
+#include "EditorToolModeController.h"
 
 namespace Editor
 {
     LevelEditorRuntime::LevelEditorRuntime() = default;
     LevelEditorRuntime::~LevelEditorRuntime() = default;
-    
+
     const char* LevelEditorRuntime::GetRuntimeName() const
     {
         return "LevelEditorRuntime";
@@ -39,12 +40,37 @@ namespace Editor
             return false;
         }
 
+        mToolModeController = std::make_unique<EditorToolModeController>();
+
+        FEditorToolModeControllerDesc toolModeDesc {};
+        toolModeDesc.InitialToolMode = EEditorToolMode::Select;
+        toolModeDesc.EnableDebugMarker = true;
+        toolModeDesc.MarkerDistance = 5.0f;
+        toolModeDesc.MarkerSize = 0.75f;
+
+        if (!mToolModeController->Initialize(mContext, toolModeDesc))
+        {
+            mToolModeController.reset();
+
+            mViewportController->Shutdown();
+            mViewportController.reset();
+
+            mInitialized = false;
+            return false;
+        }
+
         mInitialized = true;
         return true;
     }
 
     void LevelEditorRuntime::Shutdown()
     {
+        if (mToolModeController)
+        {
+            mToolModeController->Shutdown();
+            mToolModeController.reset();
+        }
+
         if (mViewportController)
         {
             mViewportController->Shutdown();
@@ -65,6 +91,11 @@ namespace Editor
             mViewportController->Tick(deltaSeconds);
         }
 
+        if (mToolModeController)
+        {
+            mToolModeController->Tick(deltaSeconds);
+        }
+
         // Позже тут будут:
         // selection tick
         // gizmo tick
@@ -79,6 +110,11 @@ namespace Editor
         if (mViewportController)
         {
             mViewportController->RenderDebug();
+        }
+
+        if (mToolModeController)
+        {
+            mToolModeController->RenderDebug();
         }
     }
 }

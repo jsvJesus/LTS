@@ -255,10 +255,13 @@
             </AdditionalIncludeDirectories>
       <LibCompiled>true</LibCompiled>
     </ClCompile>
+    <ClCompile Include="EditorToolModeController.cpp" />
     <ClCompile Include="EditorViewportController.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EditorRuntime.h" />
+    <ClInclude Include="EditorToolMode.h" />
+    <ClInclude Include="EditorToolModeController.h" />
     <ClInclude Include="EditorViewportController.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
