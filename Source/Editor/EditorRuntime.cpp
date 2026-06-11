@@ -6,6 +6,8 @@
 #include "EditorSelectionController.h"
 #include "EditorPickingController.h"
 
+#include "World/EntityId.h"
+
 namespace Editor
 {
     LevelEditorRuntime::LevelEditorRuntime() = default;
@@ -25,6 +27,8 @@ namespace Editor
             mInitialized = false;
             return false;
         }
+
+        mLastSelectionPickRequestId = 0;
 
         mViewportController = std::make_unique<EditorViewportController>();
 
@@ -50,6 +54,7 @@ namespace Editor
         worldDesc.EnableDebugDraw = true;
         worldDesc.DebugBoxHalfExtent = 0.35f;
         worldDesc.DebugAxisLength = 0.85f;
+        worldDesc.PickRadius = 0.60f;
 
         if (!mWorldController->Initialize(mContext, worldDesc))
         {
@@ -172,6 +177,8 @@ namespace Editor
         }
 
         mContext = Engine::FApplicationRuntimeContext {};
+
+        mLastSelectionPickRequestId = 0;
         mInitialized = false;
     }
 
@@ -195,10 +202,14 @@ namespace Editor
             mPickingController->Tick(deltaSeconds);
         }
 
+        RoutePickingToSelection();
+
         if (mSelectionController)
         {
             mSelectionController->Tick(deltaSeconds);
         }
+
+        SyncWorldSelectionDebug();
 
         if (mToolModeController)
         {
@@ -206,10 +217,9 @@ namespace Editor
         }
 
         // Позже тут будут:
-        // picking result routing
-        // selection picking
         // gizmo tick
         // editor tools tick
+        // inspector sync
     }
 
     void LevelEditorRuntime::RenderDebug()
@@ -241,5 +251,53 @@ namespace Editor
         {
             mToolModeController->RenderDebug();
         }
+    }
+
+    void LevelEditorRuntime::RoutePickingToSelection()
+    {
+        if (!mWorldController || !mPickingController || !mSelectionController)
+            return;
+
+        if (!mPickingController->HasLastPickRequest())
+            return;
+
+        const FEditorPickRequest& pickRequest =
+            mPickingController->GetLastPickRequest();
+
+        if (pickRequest.RequestId == mLastSelectionPickRequestId)
+            return;
+
+        mLastSelectionPickRequestId = pickRequest.RequestId;
+
+        FEditorWorldPickResult pickResult {};
+
+        if (mWorldController->TryPickEntity(pickRequest.Ray, pickResult))
+        {
+            mSelectionController->SetSelectedId(
+                static_cast<EditorSelectionId>(pickResult.EntityId)
+            );
+
+            mWorldController->SetSelectedEntityId(pickResult.EntityId);
+            return;
+        }
+
+        mSelectionController->ClearSelection();
+        mWorldController->ClearSelectedEntityId();
+    }
+
+    void LevelEditorRuntime::SyncWorldSelectionDebug()
+    {
+        if (!mWorldController || !mSelectionController)
+            return;
+
+        if (!mSelectionController->HasSelection())
+        {
+            mWorldController->ClearSelectedEntityId();
+            return;
+        }
+
+        mWorldController->SetSelectedEntityId(
+            static_cast<World::EntityId>(mSelectionController->GetSelectedId())
+        );
     }
 }

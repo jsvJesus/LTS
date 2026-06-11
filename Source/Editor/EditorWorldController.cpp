@@ -5,6 +5,7 @@
 
 #include "Core/Logger.h"
 
+#include <limits>
 #include <sstream>
 
 namespace Editor
@@ -30,6 +31,51 @@ namespace Editor
         {
             return value > 0.001f ? value : fallback;
         }
+
+        bool IntersectRaySphere(
+            const Core::Vector3& rayOrigin,
+            const Core::Vector3& rayDirection,
+            const Core::Vector3& sphereCenter,
+            const Core::f32 sphereRadius,
+            Core::f32& outDistance
+        )
+        {
+            const Core::Vector3 direction = rayDirection.Normalized();
+
+            if (direction.LengthSquared() <= 0.00001f)
+                return false;
+
+            const Core::Vector3 oc = rayOrigin - sphereCenter;
+
+            const Core::f32 a = Core::Vector3::Dot(direction, direction);
+            const Core::f32 b = 2.0f * Core::Vector3::Dot(oc, direction);
+            const Core::f32 c = Core::Vector3::Dot(oc, oc) - sphereRadius * sphereRadius;
+
+            const Core::f32 discriminant = b * b - 4.0f * a * c;
+
+            if (discriminant < 0.0f)
+                return false;
+
+            const Core::f32 sqrtDiscriminant = Core::SafeSqrt(discriminant);
+            const Core::f32 invDenominator = 1.0f / (2.0f * a);
+
+            const Core::f32 t0 = (-b - sqrtDiscriminant) * invDenominator;
+            const Core::f32 t1 = (-b + sqrtDiscriminant) * invDenominator;
+
+            if (t0 >= 0.0f)
+            {
+                outDistance = t0;
+                return true;
+            }
+
+            if (t1 >= 0.0f)
+            {
+                outDistance = t1;
+                return true;
+            }
+
+            return false;
+        }
     }
 
     bool EditorWorldController::Initialize(
@@ -51,9 +97,12 @@ namespace Editor
             return false;
         }
 
+        mSelectedEntityId = World::InvalidEntityId;
+
         mDebugDrawEnabled = desc.EnableDebugDraw;
         mDebugBoxHalfExtent = SanitizePositiveValue(desc.DebugBoxHalfExtent, 0.35f);
         mDebugAxisLength = SanitizePositiveValue(desc.DebugAxisLength, 0.85f);
+        mPickRadius = SanitizePositiveValue(desc.PickRadius, 0.60f);
 
         if (desc.CreateDefaultScene && !CreateDefaultEditorScene())
         {
@@ -80,10 +129,13 @@ namespace Editor
 
         mContext = Engine::FApplicationRuntimeContext {};
 
+        mSelectedEntityId = World::InvalidEntityId;
+
         mInitialized = false;
         mDebugDrawEnabled = true;
         mDebugBoxHalfExtent = 0.35f;
         mDebugAxisLength = 0.85f;
+        mPickRadius = 0.60f;
     }
 
     void EditorWorldController::Tick(const double deltaSeconds)
@@ -100,6 +152,77 @@ namespace Editor
             return;
 
         DrawWorldDebug();
+    }
+
+    bool EditorWorldController::TryPickEntity(
+        const FEditorPickRay& ray,
+        FEditorWorldPickResult& outResult
+    ) const
+    {
+        outResult = FEditorWorldPickResult {};
+
+        if (!mInitialized || !ray.IsValid())
+            return false;
+
+        const World::Scene* scene = mWorld.GetActiveScene();
+
+        if (!scene)
+            return false;
+
+        const Core::Vector3 rayDirection = ray.Direction.Normalized();
+
+        if (rayDirection.LengthSquared() <= 0.00001f)
+            return false;
+
+        Core::f32 bestDistance = std::numeric_limits<Core::f32>::max();
+        World::EntityId bestEntityId = World::InvalidEntityId;
+
+        for (const World::FEntity& entity : scene->GetEntities())
+        {
+            if (!entity.IsValid())
+                continue;
+
+            Core::f32 distance = 0.0f;
+
+            if (!IntersectRaySphere(
+                ray.Origin,
+                rayDirection,
+                entity.Transform.Position,
+                mPickRadius,
+                distance
+            ))
+            {
+                continue;
+            }
+
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestEntityId = entity.Id;
+            }
+        }
+
+        if (!World::IsValidEntityId(bestEntityId))
+            return false;
+
+        outResult.Hit = true;
+        outResult.EntityId = bestEntityId;
+        outResult.Distance = bestDistance;
+        outResult.Position = ray.Origin + rayDirection * bestDistance;
+
+        return true;
+    }
+
+    void EditorWorldController::SetSelectedEntityId(const World::EntityId entityId)
+    {
+        mSelectedEntityId = World::IsValidEntityId(entityId)
+            ? entityId
+            : World::InvalidEntityId;
+    }
+
+    void EditorWorldController::ClearSelectedEntityId()
+    {
+        mSelectedEntityId = World::InvalidEntityId;
     }
 
     bool EditorWorldController::CreateDefaultEditorScene()
@@ -161,10 +284,13 @@ namespace Editor
         if (!mContext.RenderSystem)
             return;
 
+        const bool selected = entity.Id == mSelectedEntityId;
+
         const Core::Vector3 position = entity.Transform.Position;
 
-        const Render::FRenderColor boxColor =
-            MakeColor(0.95f, 0.72f, 0.18f, 1.0f);
+        const Render::FRenderColor boxColor = selected
+            ? MakeColor(1.00f, 0.28f, 0.05f, 1.0f)
+            : MakeColor(0.95f, 0.72f, 0.18f, 1.0f);
 
         const Render::FRenderColor rightColor =
             MakeColor(1.00f, 0.20f, 0.20f, 1.0f);
@@ -175,7 +301,11 @@ namespace Editor
         const Render::FRenderColor forwardColor =
             MakeColor(0.20f, 0.45f, 1.00f, 1.0f);
 
-        DrawDebugBox(position, mDebugBoxHalfExtent, boxColor);
+        const Core::f32 boxHalfExtent = selected
+            ? mDebugBoxHalfExtent * 1.35f
+            : mDebugBoxHalfExtent;
+
+        DrawDebugBox(position, boxHalfExtent, boxColor);
 
         mContext.RenderSystem->DrawDebugLine(
             position,

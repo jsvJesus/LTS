@@ -32,6 +32,10 @@ namespace Editor
         [[nodiscard]] bool IsInitialized() const { return mInitialized; }
 
     private:
+        void RoutePickingToSelection();
+        void SyncWorldSelectionDebug();
+
+    private:
         Engine::FApplicationRuntimeContext mContext {};
 
         std::unique_ptr<EditorViewportController> mViewportController;
@@ -39,6 +43,8 @@ namespace Editor
         std::unique_ptr<EditorToolModeController> mToolModeController;
         std::unique_ptr<EditorSelectionController> mSelectionController;
         std::unique_ptr<EditorPickingController> mPickingController;
+
+        Core::u64 mLastSelectionPickRequestId = 0;
 
         bool mInitialized = false;
     };
