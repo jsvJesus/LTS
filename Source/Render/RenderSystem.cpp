@@ -107,7 +107,7 @@ namespace Render
         if (!mHasCurrentViewInfo)
             return;
 
-        mDebugRenderer->DrawDebugTriangle(*mDevice, mCurrentViewInfo);
+        mDebugRenderer->DrawDebugPrimitives(*mDevice, mCurrentViewInfo);
     }
 
     void RenderSystem::EndFrame()

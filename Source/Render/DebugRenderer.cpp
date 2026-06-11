@@ -6,12 +6,13 @@
 #include <cstddef>
 #include <cstring>
 #include <d3dcompiler.h>
+#include <vector>
 
 namespace Render
 {
     namespace
     {
-        constexpr const char* DebugTriangleShaderSource = R"(
+        constexpr const char* DebugLineShaderSource = R"(
 cbuffer DebugViewConstants : register(b0)
 {
     row_major float4x4 ViewProjectionMatrix;
@@ -103,13 +104,13 @@ float4 PSMain(PSInput input) : SV_TARGET
             return false;
 
         Microsoft::WRL::ComPtr<ID3DBlob> vertexShaderBlob =
-            CompileShader(DebugTriangleShaderSource, "VSMain", "vs_5_0");
+            CompileShader(DebugLineShaderSource, "VSMain", "vs_5_0");
 
         if (!vertexShaderBlob)
             return false;
 
         Microsoft::WRL::ComPtr<ID3DBlob> pixelShaderBlob =
-            CompileShader(DebugTriangleShaderSource, "PSMain", "ps_5_0");
+            CompileShader(DebugLineShaderSource, "PSMain", "ps_5_0");
 
         if (!pixelShaderBlob)
             return false;
@@ -167,30 +168,18 @@ float4 PSMain(PSInput input) : SV_TARGET
         if (FAILED(hr))
             return false;
 
-        const FDebugVertex vertices[] =
-        {
-            { {  0.0f,  2.35f, 4.0f }, { 1.0f, 0.15f, 0.10f, 1.0f } },
-            { {  1.0f,  1.00f, 4.0f }, { 0.10f, 1.0f, 0.25f, 1.0f } },
-            { { -1.0f,  1.00f, 4.0f }, { 0.15f, 0.35f, 1.0f, 1.0f } }
-        };
-
-        D3D11_BUFFER_DESC vertexBufferDesc {};
-        vertexBufferDesc.ByteWidth = static_cast<UINT>(sizeof(vertices));
-        vertexBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-        vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        vertexBufferDesc.CPUAccessFlags = 0;
-        vertexBufferDesc.MiscFlags = 0;
-        vertexBufferDesc.StructureByteStride = sizeof(FDebugVertex);
-
-        D3D11_SUBRESOURCE_DATA vertexInitialData {};
-        vertexInitialData.pSysMem = vertices;
-        vertexInitialData.SysMemPitch = 0;
-        vertexInitialData.SysMemSlicePitch = 0;
+        D3D11_BUFFER_DESC lineVertexBufferDesc {};
+        lineVertexBufferDesc.ByteWidth = static_cast<UINT>(sizeof(FDebugVertex) * MaxDebugLineVertices);
+        lineVertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+        lineVertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        lineVertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        lineVertexBufferDesc.MiscFlags = 0;
+        lineVertexBufferDesc.StructureByteStride = sizeof(FDebugVertex);
 
         hr = d3dDevice->CreateBuffer(
-            &vertexBufferDesc,
-            &vertexInitialData,
-            mVertexBuffer.GetAddressOf()
+            &lineVertexBufferDesc,
+            nullptr,
+            mDynamicLineVertexBuffer.GetAddressOf()
         );
 
         if (FAILED(hr))
@@ -220,7 +209,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     void DebugRenderer::Shutdown()
     {
         mViewConstantBuffer.Reset();
-        mVertexBuffer.Reset();
+        mDynamicLineVertexBuffer.Reset();
         mInputLayout.Reset();
         mPixelShader.Reset();
         mVertexShader.Reset();
@@ -228,7 +217,7 @@ float4 PSMain(PSInput input) : SV_TARGET
         mInitialized = false;
     }
 
-    void DebugRenderer::DrawDebugTriangle(DX11Device& device, const FRenderViewInfo& viewInfo)
+    void DebugRenderer::DrawDebugPrimitives(DX11Device& device, const FRenderViewInfo& viewInfo)
     {
         if (!mInitialized)
             return;
@@ -238,35 +227,147 @@ float4 PSMain(PSInput input) : SV_TARGET
         if (!context)
             return;
 
-        if (!mViewConstantBuffer)
+        if (!mDynamicLineVertexBuffer || !mViewConstantBuffer)
             return;
 
-        D3D11_MAPPED_SUBRESOURCE mappedResource {};
+        std::vector<FDebugVertex> vertices;
+        vertices.reserve(256);
+
+        auto addLine =
+            [&vertices](const Core::Vector3& start, const Core::Vector3& end, const float color[4])
+            {
+                if (vertices.size() + 2 > MaxDebugLineVertices)
+                    return;
+
+                FDebugVertex startVertex {};
+                startVertex.Position[0] = start.X;
+                startVertex.Position[1] = start.Y;
+                startVertex.Position[2] = start.Z;
+                startVertex.Color[0] = color[0];
+                startVertex.Color[1] = color[1];
+                startVertex.Color[2] = color[2];
+                startVertex.Color[3] = color[3];
+
+                FDebugVertex endVertex {};
+                endVertex.Position[0] = end.X;
+                endVertex.Position[1] = end.Y;
+                endVertex.Position[2] = end.Z;
+                endVertex.Color[0] = color[0];
+                endVertex.Color[1] = color[1];
+                endVertex.Color[2] = color[2];
+                endVertex.Color[3] = color[3];
+
+                vertices.push_back(startVertex);
+                vertices.push_back(endVertex);
+            };
+
+        const float gridColor[4] = { 0.22f, 0.22f, 0.22f, 1.0f };
+        const float gridCenterColor[4] = { 0.38f, 0.38f, 0.38f, 1.0f };
+
+        const float axisXColor[4] = { 1.00f, 0.15f, 0.10f, 1.0f };
+        const float axisYColor[4] = { 0.15f, 1.00f, 0.20f, 1.0f };
+        const float axisZColor[4] = { 0.15f, 0.35f, 1.00f, 1.0f };
+
+        const float triangleColor[4] = { 1.00f, 0.85f, 0.20f, 1.0f };
+
+        constexpr int GridHalfSize = 10;
+        constexpr float GridSpacing = 1.0f;
+        constexpr float GridExtent = static_cast<float>(GridHalfSize) * GridSpacing;
+
+        for (int lineIndex = -GridHalfSize; lineIndex <= GridHalfSize; ++lineIndex)
+        {
+            const float coordinate = static_cast<float>(lineIndex) * GridSpacing;
+            const float* color = lineIndex == 0 ? gridCenterColor : gridColor;
+
+            addLine(
+                Core::Vector3(-GridExtent, 0.0f, coordinate),
+                Core::Vector3( GridExtent, 0.0f, coordinate),
+                color
+            );
+
+            addLine(
+                Core::Vector3(coordinate, 0.0f, -GridExtent),
+                Core::Vector3(coordinate, 0.0f,  GridExtent),
+                color
+            );
+        }
+
+        addLine(
+            Core::Vector3(0.0f, 0.02f, 0.0f),
+            Core::Vector3(3.0f, 0.02f, 0.0f),
+            axisXColor
+        );
+
+        addLine(
+            Core::Vector3(0.0f, 0.02f, 0.0f),
+            Core::Vector3(0.0f, 3.0f, 0.0f),
+            axisYColor
+        );
+
+        addLine(
+            Core::Vector3(0.0f, 0.02f, 0.0f),
+            Core::Vector3(0.0f, 0.02f, 3.0f),
+            axisZColor
+        );
+
+        const Core::Vector3 triangleA( 0.0f, 2.35f, 4.0f);
+        const Core::Vector3 triangleB( 1.0f, 1.00f, 4.0f);
+        const Core::Vector3 triangleC(-1.0f, 1.00f, 4.0f);
+
+        addLine(triangleA, triangleB, triangleColor);
+        addLine(triangleB, triangleC, triangleColor);
+        addLine(triangleC, triangleA, triangleColor);
+
+        if (vertices.empty())
+            return;
+
+        D3D11_MAPPED_SUBRESOURCE mappedConstants {};
 
         HRESULT hr = context->Map(
             mViewConstantBuffer.Get(),
             0,
             D3D11_MAP_WRITE_DISCARD,
             0,
-            &mappedResource
+            &mappedConstants
         );
 
         if (FAILED(hr))
             return;
 
         FDebugViewConstants* constants =
-            static_cast<FDebugViewConstants*>(mappedResource.pData);
+            static_cast<FDebugViewConstants*>(mappedConstants.pData);
 
         constants->ViewProjectionMatrix = viewInfo.ViewProjectionMatrix;
 
         context->Unmap(mViewConstantBuffer.Get(), 0);
+
+        D3D11_MAPPED_SUBRESOURCE mappedVertices {};
+
+        hr = context->Map(
+            mDynamicLineVertexBuffer.Get(),
+            0,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &mappedVertices
+        );
+
+        if (FAILED(hr))
+            return;
+
+        std::memcpy(
+            mappedVertices.pData,
+            vertices.data(),
+            sizeof(FDebugVertex) * vertices.size()
+        );
+
+        context->Unmap(mDynamicLineVertexBuffer.Get(), 0);
 
         UINT stride = sizeof(FDebugVertex);
         UINT offset = 0;
 
         ID3D11Buffer* vertexBuffers[] =
         {
-            mVertexBuffer.Get()
+            mDynamicLineVertexBuffer.Get()
         };
 
         ID3D11Buffer* constantBuffers[] =
@@ -275,7 +376,7 @@ float4 PSMain(PSInput input) : SV_TARGET
         };
 
         context->IASetInputLayout(mInputLayout.Get());
-        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
         context->IASetVertexBuffers(0, 1, vertexBuffers, &stride, &offset);
 
         context->VSSetShader(mVertexShader.Get(), nullptr, 0);
@@ -283,6 +384,6 @@ float4 PSMain(PSInput input) : SV_TARGET
 
         context->PSSetShader(mPixelShader.Get(), nullptr, 0);
 
-        context->Draw(3, 0);
+        context->Draw(static_cast<UINT>(vertices.size()), 0);
     }
 }

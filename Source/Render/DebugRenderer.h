@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include <d3d11.h>
 #include <wrl/client.h>
 
@@ -21,9 +23,11 @@ namespace Render
         bool Initialize(DX11Device& device);
         void Shutdown();
 
-        void DrawDebugTriangle(DX11Device& device, const FRenderViewInfo& viewInfo);
+        void DrawDebugPrimitives(DX11Device& device, const FRenderViewInfo& viewInfo);
 
     private:
+        static constexpr std::uint32_t MaxDebugLineVertices = 65536;
+
         struct FDebugVertex
         {
             float Position[3];
@@ -42,7 +46,7 @@ namespace Render
         Microsoft::WRL::ComPtr<ID3D11PixelShader> mPixelShader;
         Microsoft::WRL::ComPtr<ID3D11InputLayout> mInputLayout;
 
-        Microsoft::WRL::ComPtr<ID3D11Buffer> mVertexBuffer;
+        Microsoft::WRL::ComPtr<ID3D11Buffer> mDynamicLineVertexBuffer;
         Microsoft::WRL::ComPtr<ID3D11Buffer> mViewConstantBuffer;
     };
 }
