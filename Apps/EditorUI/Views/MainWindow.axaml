@@ -2,15 +2,228 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:EditorUI.ViewModels"
         mc:Ignorable="d"
-        d:DesignWidth="800"
-        d:DesignHeight="450"
+        x:DataType="vm:MainWindowViewModel"
+        d:DesignWidth="1180"
+        d:DesignHeight="720"
+        Width="1180"
+        Height="720"
+        MinWidth="980"
+        MinHeight="620"
         x:Class="EditorUI.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
-        Title="EditorUI">
+        Title="Level Editor">
 
-    <TextBlock Text="Editor UI"
-               HorizontalAlignment="Center"
-               VerticalAlignment="Center"/>
+    <Grid RowDefinitions="Auto,*"
+          Background="#15171C">
 
+        <Border Grid.Row="0"
+                Padding="22,16"
+                Background="#101217"
+                BorderBrush="#2B3038"
+                BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel>
+                    <TextBlock Text="Level Editor"
+                               FontSize="28"
+                               FontWeight="SemiBold"
+                               Foreground="#F0F3F7"/>
+                    <TextBlock Text="Создание, импорт и открытие карт"
+                               Margin="0,4,0,0"
+                               Foreground="#98A2B3"/>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="Обновить список"
+                        Width="160"
+                        Height="38"
+                        Command="{Binding RefreshMapsCommand}"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1"
+              Margin="22"
+              ColumnDefinitions="390,18,*,18,340">
+
+            <!-- Create / Import map -->
+            <Border Grid.Column="0"
+                    Padding="18"
+                    Background="#1B1E25"
+                    BorderBrush="#2D333D"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <ScrollViewer>
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="1. Создать карту"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="#F0F3F7"/>
+
+                        <TextBlock Text="Создаёт папку карты, map.json и пустой terrain.r16."
+                                   TextWrapping="Wrap"
+                                   Foreground="#98A2B3"/>
+
+                        <TextBlock Text="Имя карты" Foreground="#CDD5DF"/>
+                        <TextBox Watermark="example: test_map"
+                                 Text="{Binding NewMapName, Mode=TwoWay}"/>
+
+                        <Grid ColumnDefinitions="*,10,*">
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock Text="Width" Foreground="#CDD5DF"/>
+                                <TextBox Text="{Binding TerrainWidthText, Mode=TwoWay}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Spacing="6">
+                                <TextBlock Text="Height" Foreground="#CDD5DF"/>
+                                <TextBox Text="{Binding TerrainHeightText, Mode=TwoWay}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,10,*">
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock Text="Cell size" Foreground="#CDD5DF"/>
+                                <TextBox Text="{Binding CellSizeText, Mode=TwoWay}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Spacing="6">
+                                <TextBlock Text="Max height" Foreground="#CDD5DF"/>
+                                <TextBox Text="{Binding MaxHeightText, Mode=TwoWay}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Content="Создать карту"
+                                Height="42"
+                                Margin="0,8,0,0"
+                                Command="{Binding CreateMapCommand}"/>
+
+                        <Separator Margin="0,12"/>
+
+                        <TextBlock Text="2. Импортировать .r16"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="#F0F3F7"/>
+
+                        <TextBlock Text="Создаёт карту из выбранного heightmap .r16. Размеры нужно указать вручную."
+                                   TextWrapping="Wrap"
+                                   Foreground="#98A2B3"/>
+
+                        <TextBlock Text="Файл .r16" Foreground="#CDD5DF"/>
+
+                        <Grid ColumnDefinitions="*,8,Auto">
+                            <TextBox Grid.Column="0"
+                                     IsReadOnly="True"
+                                     Watermark="Выбери файл..."
+                                     Text="{Binding ImportHeightmapPath}"/>
+                            <Button Grid.Column="2"
+                                    Content="..."
+                                    Width="44"
+                                    Click="SelectHeightmapButton_Click"/>
+                        </Grid>
+
+                        <Button Content="Импортировать карту"
+                                Height="42"
+                                Margin="0,8,0,0"
+                                Command="{Binding ImportMapCommand}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Open map -->
+            <Border Grid.Column="2"
+                    Padding="18"
+                    Background="#1B1E25"
+                    BorderBrush="#2D333D"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <Grid RowDefinitions="Auto,*">
+                    <StackPanel Grid.Row="0" Spacing="6">
+                        <TextBlock Text="3. Открыть карту"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="#F0F3F7"/>
+                        <TextBlock Text="Список карт берётся из Content/Maps."
+                                   Foreground="#98A2B3"/>
+                    </StackPanel>
+
+                    <ListBox Grid.Row="1"
+                             Margin="0,14,0,0"
+                             ItemsSource="{Binding Maps}"
+                             SelectedItem="{Binding SelectedMap, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EditorMapItemViewModel">
+                                <Border Padding="12"
+                                        Margin="0,0,0,8"
+                                        Background="#232832"
+                                        CornerRadius="6">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#F0F3F7"/>
+                                        <TextBlock Text="{Binding MapName}"
+                                                   Foreground="#98A2B3"/>
+                                        <TextBlock Text="{Binding TerrainInfo}"
+                                                   Foreground="#98A2B3"/>
+                                        <TextBlock Text="{Binding MapPath}"
+                                                   FontSize="11"
+                                                   Foreground="#667085"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- Actions / status -->
+            <Border Grid.Column="4"
+                    Padding="18"
+                    Background="#1B1E25"
+                    BorderBrush="#2D333D"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Действия"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="#F0F3F7"/>
+
+                    <Button Content="Открыть выбранную карту"
+                            Height="44"
+                            Command="{Binding OpenSelectedMapCommand}"/>
+
+                    <Button Content="Открыть папку Content/Maps"
+                            Height="40"
+                            Command="{Binding OpenMapsFolderCommand}"/>
+
+                    <Separator Margin="0,8"/>
+
+                    <TextBlock Text="Project root"
+                               Foreground="#CDD5DF"/>
+                    <TextBox IsReadOnly="True"
+                             Text="{Binding ProjectRoot}"
+                             TextWrapping="Wrap"/>
+
+                    <TextBlock Text="Status"
+                               Foreground="#CDD5DF"/>
+                    <Border Padding="12"
+                            MinHeight="170"
+                            Background="#101217"
+                            BorderBrush="#2D333D"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   TextWrapping="Wrap"
+                                   Foreground="#CDD5DF"/>
+                    </Border>
+
+                    <TextBlock Text="Пока это только меню карты. C++ LevelEditor получает --map, загрузку map.json в runtime подключим следующим шагом."
+                               TextWrapping="Wrap"
+                               Foreground="#98A2B3"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
 </Window>
